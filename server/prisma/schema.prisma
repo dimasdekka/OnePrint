@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = "mysql://oneprint:oneprintpassword@localhost:3306/oneprint"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String   // bcrypt hash
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  sessions  Session[]
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  userId      String?  // FK to User
+  kioskId     String?
+  socketId    String?
+  
+  // Normalized file data (1:1 relation)
+  fileId      String?  @unique
+  
+  copies      Int      @default(1)
+  colorMode   String?  @default("color") // bw or color
+  pageRange   String?  @default("all")
+  pageCount   Int      @default(1)
+  status      String   @default("waiting")
+  expiresAt   DateTime
+  used        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  user          User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  transactions  Transaction[]
+  file          File?         @relation(fields: [fileId], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id             String   @id @default(uuid())
+  sessionId      String
+  printerId      String?  // FK to Printer
+  midtransToken  String?
+  orderId        String   @unique
+  paymentStatus  String   @default("pending") // pending, paid, failed, expired
+  amount         Int
+  paidAt         DateTime? // when payment was confirmed
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  session        Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  printer        Printer?  @relation(fields: [printerId], references: [id], onDelete: SetNull)
+}
+
+model Printer {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  printerId   String?  @unique // system printer id
+  description String?
+  status      String   @default("Offline") // online/offline
+  driver      String?
+  isConnected Boolean  @default(true)
+  lastSync    DateTime? // last status sync
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  transactions Transaction[]
+  settings     PrinterSettings?
+}
+
+model PrinterSettings {
+  id                 String   @id @default(uuid())
+  printerId          String   @unique
+  pricePerPageBw     Decimal  @default(1500) // price for B&W per page (Rp)
+  pricePerPageColor  Decimal  @default(3000) // price for color per page (Rp)
+  updatedAt          DateTime @updatedAt
+
+  printer            Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
+}
+
+model File {
+  id          String   @id @default(uuid())
+  filename    String   @db.VarChar(255)
+  filepath    String   @db.VarChar(255)
+  totalPages  Int
+  uploadedAt  DateTime @default(now())
+  
+  session     Session?
+}

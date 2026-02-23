@@ -1,0 +1,31 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@prisma/client": "^5.10.2",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.4",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "midtrans-client": "^1.4.3",
+    "multer": "^2.0.2",
+    "nodemon": "^3.1.11",
+    "pdf-parse": "^1.1.1",
+    "pdf-to-printer": "^5.7.0",
+    "prisma": "^5.10.2",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.3",
+    "uuid": "^13.0.0"
+  }
+}
