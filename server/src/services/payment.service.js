@@ -19,7 +19,7 @@ const logger = require("../utils/logger");
  * @param {string} colorMode - 'bw' or 'color'
  * @returns {Promise<number>} Price per page
  */
-const getPricePerPage = async (printerId, colorMode = "color") => {
+const getPricePerPage = async (printerId, colorMode = "bw") => {
   // If no specific printer, get default from any printer settings
   const settings = printerId
     ? await prisma.printerSettings.findUnique({
@@ -48,7 +48,7 @@ const getPricePerPage = async (printerId, colorMode = "color") => {
 const calculateAmount = async (
   pageCount,
   copies = 1,
-  colorMode = "color",
+  colorMode = "bw",
   printerId = null,
 ) => {
   const pricePerPage = await getPricePerPage(printerId, colorMode);
@@ -106,7 +106,7 @@ const createMidtransToken = async (sessionId, filename, printJobData = {}) => {
     printerId = null,
     pageCount = 1,
     copies = 1,
-    colorMode = "color",
+    colorMode = "bw",
     amount = null,
   } = printJobData;
 
@@ -129,6 +129,11 @@ const createMidtransToken = async (sessionId, filename, printJobData = {}) => {
     customer_details: {
       first_name: "OnePrint",
       last_name: "User",
+    },
+    callbacks: {
+      finish: process.env.CLIENT_URL || "http://localhost:3000",
+      error: process.env.CLIENT_URL || "http://localhost:3000",
+      close: process.env.CLIENT_URL || "http://localhost:3000",
     },
     enabled_payments: ["other_qris"],
     item_details: [
@@ -233,90 +238,6 @@ const markTransactionAsPaid = async (orderId) => {
   return await updateTransactionStatus(orderId, "paid");
 };
 
-/**
- * Handle Midtrans webhook notification
- * @param {Object} notification - Midtrans notification payload
- * @returns {Promise<Object>} Updated transaction
- */
-const handleMidtransNotification = async (notification) => {
-  const {
-    order_id: orderId,
-    transaction_status: transactionStatus,
-    payment_type: paymentType,
-  } = notification;
-
-  logger.info("Midtrans notification received", {
-    orderId,
-    transactionStatus,
-    paymentType,
-  });
-
-  // Get transaction to find session
-  const transaction = await prisma.transaction.findUnique({
-    where: { orderId },
-    include: { session: true },
-  });
-
-  if (!transaction) {
-    logger.warn("Transaction not found for webhook", { orderId });
-    return null;
-  }
-
-  let paymentStatus = "pending";
-
-  // Map Midtrans transaction status to our status
-  if (transactionStatus === "settlement" || transactionStatus === "capture") {
-    paymentStatus = "paid";
-  } else if (
-    transactionStatus === "cancel" ||
-    transactionStatus === "expire" ||
-    transactionStatus === "deny"
-  ) {
-    paymentStatus = "failed";
-  } else if (transactionStatus === "pending") {
-    paymentStatus = "pending";
-  }
-
-  // Update transaction
-  const updatedTransaction = await updateTransactionStatus(
-    orderId,
-    paymentStatus,
-  );
-
-  logger.info("Transaction updated from webhook", {
-    orderId,
-    paymentStatus,
-    sessionId: transaction.session.id,
-  });
-
-  return updatedTransaction;
-};
-
-/**
- * Verify Midtrans notification signature
- * @param {Object} notification - Midtrans notification
- * @param {string} signature - Signature from header
- * @returns {boolean} Is signature valid
- */
-const verifyMidtransSignature = (notification, signature) => {
-  const crypto = require("crypto");
-  const serverKey = process.env.MIDTRANS_SERVER_KEY || "";
-
-  const {
-    order_id: orderId,
-    status_code: statusCode,
-    gross_amount: grossAmount,
-  } = notification;
-
-  // Create signature
-  const signatureKey = crypto
-    .createHash("sha512")
-    .update(orderId + statusCode + grossAmount + serverKey)
-    .digest("hex");
-
-  return signatureKey === signature;
-};
-
 module.exports = {
   getPricePerPage,
   calculateAmount,
@@ -325,6 +246,4 @@ module.exports = {
   processPayment,
   updateTransactionStatus,
   markTransactionAsPaid,
-  handleMidtransNotification,
-  verifyMidtransSignature,
 };

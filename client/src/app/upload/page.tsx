@@ -19,7 +19,7 @@ export default function UploadPage() {
 
       if (!sid) {
         setSessionError(
-          "Link tidak valid. Silakan scan ulang QR code dari layar kiosk.",
+          "Link tidak valid. Silakan scan ulang QR code dari layar e-print.",
         );
         setValidatingSession(false);
         return;
@@ -49,7 +49,7 @@ export default function UploadPage() {
       } catch (error) {
         console.error("Session validation failed:", error);
         setSessionError(
-          "Tidak dapat terhubung ke server. Pastikan kiosk menyala dan coba scan ulang.",
+          "Tidak dapat terhubung ke server. Pastikan e-print menyala dan coba scan ulang.",
         );
         setValidatingSession(false);
       }
@@ -101,93 +101,74 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 font-sans">
+    <div className="flex flex-col min-h-screen bg-white font-sans text-black relative">
       {/* Header */}
-      <div className="bg-white shadow-md p-4 flex items-center justify-center">
-        <h1 className="text-xl font-extrabold text-blue-900">
-          📄 OnePrint Upload
-        </h1>
+      <div className="p-8">
+        <h1 className="text-xl font-bold tracking-tight">E-Print Service</h1>
+        <p className="text-sm text-gray-600">Universitas Pamulang Serang</p>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-6">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto">
         {validatingSession ? (
-          // Loading state
-          <div className="bg-white rounded-2xl shadow-lg p-10 text-center max-w-sm w-full">
-            <div className="animate-spin rounded-full h-14 w-14 border-b-4 border-blue-600 mx-auto mb-5"></div>
-            <p className="text-gray-600 font-medium">Memverifikasi sesi...</p>
+          <div className="text-center w-full">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-black mx-auto mb-4"></div>
+            <p className="text-sm text-gray-600 font-medium">
+              Memverifikasi sesi...
+            </p>
           </div>
         ) : sessionError ? (
-          // Session error state — mobile-friendly, no link to QR page
-          <div className="bg-white rounded-2xl shadow-lg p-10 text-center max-w-sm w-full">
-            <div className="text-5xl mb-5">⚠️</div>
-            <h2 className="text-xl font-bold text-gray-800 mb-3">
+          <div className="text-center w-full border border-black rounded-3xl p-8">
+            <div className="w-12 h-12 rounded-full border border-black flex items-center justify-center mx-auto mb-4 font-bold text-xl">
+              !
+            </div>
+            <h2 className="text-xl font-bold text-black mb-2">
               Link Tidak Valid
             </h2>
-            <p className="text-gray-500 text-sm leading-relaxed">
+            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
               {sessionError}
             </p>
-            <div className="mt-6 bg-blue-50 border border-blue-100 rounded-xl p-4">
-              <p className="text-blue-700 text-sm font-medium">
-                💡 Scan QR code yang ada di layar kiosk untuk mendapatkan link
-                baru.
-              </p>
-            </div>
+            <p className="text-xs font-bold text-black">
+              Scan QR code yang ada di layar e-print untuk mendapatkan link
+              baru.
+            </p>
           </div>
         ) : uploadSuccess ? (
-          // Success state — lock here, no redirect to QR page
-          <div className="bg-white rounded-2xl shadow-lg p-10 text-center max-w-sm w-full">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
+          <div className="text-center w-full border border-black rounded-3xl p-8">
+            <div className="w-12 h-12 rounded-full border border-black flex items-center justify-center mx-auto mb-4">
               <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-10 w-10 text-green-600"
-                fill="none"
+                width="24"
+                height="24"
                 viewBox="0 0 24 24"
+                fill="none"
                 stroke="currentColor"
+                strokeWidth="2"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.5}
-                  d="M5 13l4 4L19 7"
-                />
+                <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
             </div>
-            <h2 className="text-2xl font-extrabold text-gray-900 mb-2">
+            <h2 className="text-xl font-bold text-black mb-2">
               File Berhasil Dikirim!
             </h2>
-            <p className="text-gray-500 mb-6 text-sm leading-relaxed">
-              File kamu sudah terkirim ke kiosk. Halaman ini sudah tidak
-              diperlukan lagi.
-            </p>
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-              <p className="text-blue-700 text-sm font-semibold">
-                👉 Lanjutkan ke layar kiosk untuk mengatur jumlah copy dan
-                melakukan pembayaran.
-              </p>
-            </div>
-            <p className="mt-6 text-xs text-gray-400">
-              Anda boleh menutup halaman ini.
+            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+              File kamu sudah terkirim ke e-print. Anda boleh menutup halaman
+              ini.
             </p>
           </div>
         ) : (
-          // Upload form
-          <div className="bg-white rounded-2xl shadow-lg p-8 max-w-sm w-full">
-            <div className="text-center mb-6">
-              <div className="text-5xl mb-3">📱</div>
-              <h2 className="text-2xl font-extrabold text-gray-900">
-                Pilih File
+          <div className="w-full flex flex-col items-center">
+            <div className="text-center mb-10">
+              <h2 className="text-2xl font-bold text-black mb-1">
+                Upload File PDF
               </h2>
-              <p className="text-gray-500 text-sm mt-1">
-                PDF atau gambar, maks. 50MB
+              <p className="text-sm text-gray-600">
+                Silahkan unggah dokumen yang ingin Anda print
               </p>
             </div>
 
             <label
               htmlFor="file-input"
-              className={`flex flex-col items-center justify-center w-full border-2 border-dashed rounded-xl p-8 cursor-pointer transition-all ${
-                uploading
-                  ? "border-blue-300 bg-blue-50 cursor-wait"
-                  : "border-gray-300 hover:border-blue-500 hover:bg-blue-50"
+              className={`flex flex-col items-center justify-center w-full border border-black border-dashed rounded-3xl p-10 cursor-pointer transition-all ${
+                uploading ? "opacity-50 cursor-wait" : "hover:bg-gray-50"
               }`}
             >
               <input
@@ -200,34 +181,64 @@ export default function UploadPage() {
               />
               {uploading ? (
                 <>
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-4 border-blue-600 mb-3"></div>
-                  <p className="text-blue-700 font-semibold text-sm">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black mb-4"></div>
+                  <p className="text-black font-bold text-base">
                     Sedang mengupload...
                   </p>
+                  <p className="text-gray-500 text-sm mt-1">Mohon tunggu...</p>
                 </>
               ) : (
                 <>
-                  <div className="text-4xl mb-3">📄</div>
-                  <p className="text-gray-700 font-bold text-base mb-1">
-                    Tap untuk pilih file PDF
+                  <div className="w-16 h-16 rounded-full border border-black flex items-center justify-center mb-6">
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                    >
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="17 8 12 3 7 8"></polyline>
+                      <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-bold text-black mb-1">
+                    Pilih File PDF
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-8 text-center">
+                    Klik untuk menelusuri atau seret file kesini
                   </p>
-                  <p className="text-gray-400 text-xs">Hanya file PDF (.pdf)</p>
+                  <div className="border border-black rounded-full px-6 py-2 text-sm font-bold flex items-center gap-2">
+                    <span>+</span> Pilih File
+                  </div>
                 </>
               )}
             </label>
 
-            {uploading && (
-              <div className="mt-4">
-                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                  <div className="bg-blue-600 h-2 rounded-full animate-pulse w-full"></div>
+            {!uploading && (
+              <div className="mt-8 flex items-start gap-3 px-2">
+                <div className="w-5 h-5 rounded-full border border-black flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-[10px] font-bold">!</span>
                 </div>
-                <p className="text-center text-xs text-gray-500 mt-2">
-                  Menganalisis halaman dokumen...
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Maksimal ukuran file{" "}
+                  <span className="font-bold text-black">50MB</span>. Pastikan
+                  format file adalah{" "}
+                  <span className="font-bold text-black">PDF</span> untuk
+                  menjaga tata letak dokumen Anda.
                 </p>
               </div>
             )}
           </div>
         )}
+      </div>
+
+      {/* Footer */}
+      <div className="p-8 text-center pb-12">
+        <p className="text-xs text-gray-600">
+          ©2026 E-Print Service | All Rights Reserved.
+        </p>
       </div>
     </div>
   );

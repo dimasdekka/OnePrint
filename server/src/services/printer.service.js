@@ -200,6 +200,13 @@ const sendToPrinter = async (printerId, filePath, copies = 1) => {
       copies,
     });
 
+    if (printer.name === DUMMY_PRINTER.NAME) {
+      logger.info("Simulating print job for Dummy Printer");
+      // Simulate printing time (2s per copy)
+      await new Promise((resolve) => setTimeout(resolve, copies * 2000));
+      return true;
+    }
+
     // Use pdf-to-printer for reliable printing to a named printer
     await print(filePath, {
       printer: printer.name,
