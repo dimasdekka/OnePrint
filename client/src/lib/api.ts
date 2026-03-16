@@ -58,10 +58,10 @@ export const sessionAPI = {
  */
 export const paymentAPI = {
   generateToken: (data: PaymentData) =>
-    api.post<MidtransResponse>("/api/order/token", data),
+    api.post<MidtransResponse>("/api/tx/token", data),
 
   complete: (data: PaymentCompleteRequest) =>
-    api.post("/api/order/complete", data),
+    api.post("/api/tx/complete", data),
 };
 
 /**

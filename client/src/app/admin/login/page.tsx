@@ -12,15 +12,7 @@ export default function AdminLogin() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const getApiUrl = () => {
-    // If running in browser check protocol/hostname, otherwise fallback
-    if (typeof window !== "undefined") {
-      const proto = window.location.protocol;
-      const host = window.location.hostname;
-      return `${proto}//${host}:3001`;
-    }
-    return "http://localhost:3001";
-  };
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +21,7 @@ export default function AdminLogin() {
 
     try {
       await axios.post(
-        `${getApiUrl()}/api/auth/login`,
+        "/api/auth/login",
         { username, password },
         { withCredentials: true },
       );

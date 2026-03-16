@@ -5,9 +5,6 @@ import { useRouter } from "next/navigation";
 import { io } from "socket.io-client";
 import axios from "axios";
 
-// NOTE: Ideally we use env vars for URLs
-const API_URL = "http://localhost:3001";
-
 export default function ScanPage({
   params,
 }: {

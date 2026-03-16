@@ -1,22 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { io } from "socket.io-client";
+import { useEffect, useState, useRef } from "react";
+import { createSocket } from "@/lib/socket";
 import { QRCodeSVG } from "qrcode.react";
 
 export default function KioskPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [status, setStatus] = useState("Initializing System...");
-  const [socket, setSocket] = useState<any>(null);
+  const kioskIdRef = useRef<string>("kiosk_" + Math.floor(Math.random() * 1000));
+  const socketRef = useRef<any>(null);
 
   useEffect(() => {
-    const newSocket = io("http://localhost:3001");
-    setSocket(newSocket);
+    const newSocket = createSocket();
+    socketRef.current = newSocket;
 
     newSocket.on("connect", () => {
       setStatus("System Ready");
-      const kioskId = "kiosk_" + Math.floor(Math.random() * 1000);
-      newSocket.emit("register_kiosk", kioskId);
+      newSocket.emit("register_kiosk", kioskIdRef.current);
     });
 
     newSocket.on("session_init", (data: { sessionId: string }) => {
@@ -27,8 +27,8 @@ export default function KioskPage() {
       setStatus("User Connected. Waiting for File...");
     });
 
-    newSocket.on("print_start", (data: { filename: string }) => {
-      setStatus(`Processing: ${data.filename}`);
+    newSocket.on("print_started", () => {
+      setStatus(`Processing...`);
     });
 
     newSocket.on("print_complete", () => {
@@ -39,11 +39,17 @@ export default function KioskPage() {
     });
 
     return () => {
-      newSocket.disconnect();
+      newSocket.off("connect");
+      newSocket.off("session_init");
+      newSocket.off("user_connected");
+      newSocket.off("print_started");
+      newSocket.off("print_complete");
     };
   }, []);
 
-  const scanUrl = sessionId ? `http://localhost:3000/scan/${sessionId}` : "";
+  const protocol = typeof window !== "undefined" ? window.location.protocol : "http:";
+  const host = typeof window !== "undefined" ? window.location.host : "localhost:3000";
+  const scanUrl = sessionId ? `${protocol}//${host}/scan/${sessionId}` : "";
 
   return (
     <div className="flex min-h-screen bg-gray-900 text-white font-sans overflow-hidden">

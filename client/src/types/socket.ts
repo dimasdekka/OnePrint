@@ -10,6 +10,7 @@ export interface ServerToClientEvents {
     filePath: string;
   }) => void;
   print_started: () => void;
+  print_progress: (data: { sessionId: string; percent: number }) => void;
   print_complete: () => void;
   printer_update: () => void;
   user_connected: (data: { message: string }) => void;
@@ -17,6 +18,6 @@ export interface ServerToClientEvents {
 }
 
 export interface ClientToServerEvents {
-  register_kiosk: (kioskId: string) => void;
+  register_kiosk: (kioskId: string, existingSessionId?: string | null) => void;
   join_session: (data: { sessionId: string }) => void;
 }

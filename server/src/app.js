@@ -26,13 +26,9 @@ try {
 // Middleware
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (!origin)
-        return callback(
-          null,
-          process.env.CLIENT_URL || "http://localhost:3000",
-        );
-      return callback(null, origin);
+    origin: function(origin, callback) {
+      // Allow any origin for now to completely bypass CORS issues on local network
+      callback(null, true);
     },
     credentials: true,
   }),

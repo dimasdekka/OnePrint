@@ -12,7 +12,6 @@ export default function PrinterManager({
   const {
     printers,
     fetchPrinters,
-    getApiUrl,
     showAddPrinter,
     setShowAddPrinter,
     loadingPrinters,
@@ -27,7 +26,7 @@ export default function PrinterManager({
     setShowAddPrinter(true);
     setLoadingPrinters(true);
     try {
-      const { data } = await axios.get(`${getApiUrl()}/api/system/printers`);
+      const { data } = await axios.get("/api/system/printers");
       setOsPrinters(data);
       if (data.length > 0) setSelectedOsPrinter(data[0].Name);
     } catch {
@@ -47,7 +46,7 @@ export default function PrinterManager({
       const printerData = osPrinters.find(
         (p: any) => p.Name === selectedOsPrinter,
       );
-      await axios.post(`${getApiUrl()}/api/admin/printers`, {
+      await axios.post("/api/admin/printers", {
         name: printerData.Name,
         driver: printerData.DriverName,
       });
@@ -70,7 +69,7 @@ export default function PrinterManager({
       "Yakin ingin menghapus printer ini?",
       async () => {
         try {
-          await axios.delete(`${getApiUrl()}/api/admin/printers/${id}`);
+          await axios.delete(`/api/admin/printers/${id}`);
           fetchPrinters();
         } catch {
           showModal("alert", "Error", "Gagal menghapus printer");
@@ -86,9 +85,7 @@ export default function PrinterManager({
       `Kirim test print ke ${printerName}?`,
       async () => {
         try {
-          await axios.post(
-            `${getApiUrl()}/api/admin/printers/${id}/test-print`,
-          );
+          await axios.post(`/api/admin/printers/${id}/test-print`);
           showModal(
             "info",
             "Berhasil",
@@ -103,9 +100,7 @@ export default function PrinterManager({
 
   const handleSyncStatus = async (id: string, printerName: string) => {
     try {
-      const { data } = await axios.post(
-        `${getApiUrl()}/api/admin/printers/${id}/sync-status`,
-      );
+      const { data } = await axios.post(`/api/admin/printers/${id}/sync-status`);
       adminData.setPrinters((prev: any) =>
         prev.map((p: any) => (p.id === id ? { ...p, status: data.status } : p)),
       );

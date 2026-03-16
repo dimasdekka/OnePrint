@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { io } from "socket.io-client";
+import { useState, useEffect, useRef } from "react";
+import { createSocket } from "@/lib/socket";
 import axios from "axios";
 import type { KioskState } from "@/types/kiosk";
 
@@ -7,7 +7,7 @@ export const useKioskSession = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [state, setState] = useState<KioskState>("waiting");
-  const [socket, setSocket] = useState<any>(null);
+  const kioskIdRef = useRef<string>("kiosk_" + Math.floor(Math.random() * 1000));
   const [printersAvailable, setPrintersAvailable] = useState(true);
 
   // Pricing Settings
@@ -31,17 +31,13 @@ export const useKioskSession = () => {
   useEffect(() => {
     const checkPrinters = async () => {
       try {
-        const apiProto = window.location.protocol;
-        const apiHost = window.location.hostname;
-        const apiUrl = `${apiProto}//${apiHost}:3001`;
-
-        const { data } = await axios.get(`${apiUrl}/api/admin/printers`);
+        const { data } = await axios.get("/api/admin/printers");
         const available =
           data.length > 0 && data.some((p: any) => p.status === "Online");
         setPrintersAvailable(available);
 
         try {
-          const settingsObj = await axios.get(`${apiUrl}/api/admin/settings`);
+          const settingsObj = await axios.get("/api/admin/settings");
           if (settingsObj.data) {
             setPriceBw(settingsObj.data.pricePerPageBw || 1500);
             setPriceColor(settingsObj.data.pricePerPageColor || 3000);
@@ -94,14 +90,12 @@ export const useKioskSession = () => {
       }
     }
 
-    const newSocket = io(socketUrl);
-    setSocket(newSocket);
-
+    const newSocket = createSocket();
+    
     newSocket.on("connect", () => {
-      const kioskId = "kiosk_" + Math.floor(Math.random() * 1000);
       newSocket.emit(
         "register_kiosk",
-        kioskId,
+        kioskIdRef.current,
         savedFile ? existingSessionId : null,
       );
     });
@@ -133,7 +127,8 @@ export const useKioskSession = () => {
 
         const fileData = { ...data, filePath: normalizedPath };
         localStorage.setItem("oneprint_file", JSON.stringify(fileData));
-        if (sessionId) localStorage.setItem("oneprint_session", sessionId);
+        const activeSession = localStorage.getItem("oneprint_session");
+        if (activeSession) localStorage.setItem("oneprint_session", activeSession);
       },
     );
 
@@ -185,9 +180,15 @@ export const useKioskSession = () => {
     });
 
     return () => {
-      newSocket.disconnect();
+      newSocket.off("connect");
+      newSocket.off("session_init");
+      newSocket.off("file-uploaded");
+      newSocket.off("print_started");
+      newSocket.off("print_progress");
+      newSocket.off("print_complete");
+      newSocket.off("printer_update");
     };
-  }, [sessionId]); // Important dependency
+  }, []);
 
   // Calculate pages based on range
   useEffect(() => {
@@ -230,10 +231,6 @@ export const useKioskSession = () => {
     setLoadingPayment(true);
 
     try {
-      const apiProto = window.location.protocol;
-      const apiHost = window.location.hostname;
-      const apiUrl = `${apiProto}//${apiHost}:3001`;
-
       const pricePerPage = colorMode === "color" ? priceColor : priceBw;
       const totalAmount = copies * estimatedPages * pricePerPage;
 
@@ -246,7 +243,7 @@ export const useKioskSession = () => {
       };
 
       const { data } = await axios.post(
-        `${apiUrl}/api/order/token`,
+        "/api/tx/token",
         paymentData,
       );
 
@@ -260,7 +257,7 @@ export const useKioskSession = () => {
       window.snap.pay(data.token, {
         onSuccess: async function (result: any) {
           console.log("Payment Success:", result);
-          await axios.post(`${apiUrl}/api/order/complete`, {
+          await axios.post("/api/tx/complete", {
             sessionId: activeSession,
             orderId: data.orderId,
           });

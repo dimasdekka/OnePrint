@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import { io } from "socket.io-client";
+import { SOCKET_URL } from "@/lib/constants";
 import type { Printer, Report, Summary } from "@/types/admin";
 
 export const useAdminData = () => {
@@ -27,15 +28,9 @@ export const useAdminData = () => {
   const [priceColor, setPriceColor] = useState(3000);
   const [loadingSettings, setLoadingSettings] = useState(false);
 
-  const getApiUrl = useCallback(() => {
-    const proto = window.location.protocol;
-    const host = window.location.hostname;
-    return `${proto}//${host}:3001`;
-  }, []);
-
   const fetchPrinters = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${getApiUrl()}/api/admin/printers`);
+      const { data } = await axios.get("/api/admin/printers");
       setPrinters(data);
     } catch (e) {
       console.error("Failed to fetch printers", e);
@@ -50,8 +45,8 @@ export const useAdminData = () => {
       if (filterTo) params.append("to", filterTo);
 
       const [repRes, sumRes] = await Promise.all([
-        axios.get(`${getApiUrl()}/api/admin/reports?${params}`),
-        axios.get(`${getApiUrl()}/api/admin/reports/summary`),
+        axios.get(`/api/admin/reports?${params}`),
+        axios.get("/api/admin/reports/summary"),
       ]);
 
       setReports(repRes.data);
@@ -65,7 +60,7 @@ export const useAdminData = () => {
 
   const fetchSettings = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${getApiUrl()}/api/admin/settings`);
+      const { data } = await axios.get("/api/admin/settings");
       if (data) {
         setPriceBw(data.pricePerPageBw || 1500);
         setPriceColor(data.pricePerPageColor || 3000);
@@ -76,7 +71,9 @@ export const useAdminData = () => {
   }, [getApiUrl]);
 
   const setupSocket = useCallback(() => {
-    const socket = io(`${getApiUrl()}`);
+    const socket = io(SOCKET_URL, {
+      transports: ["websocket", "polling"],
+    });
 
     socket.on("admin_job_update", (job: any) => {
       setPrinters((prev) =>
@@ -109,7 +106,7 @@ export const useAdminData = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        await axios.get(`${getApiUrl()}/api/auth/me`);
+        await axios.get("/api/auth/me");
         setIsAuthorized(true);
         fetchPrinters();
         fetchReports();
@@ -134,7 +131,7 @@ export const useAdminData = () => {
     fetchPrinters,
     fetchReports,
     fetchSettings,
-    getApiUrl,
+    fetchSettings,
     router,
     setupSocket,
   ]);
@@ -167,6 +164,5 @@ export const useAdminData = () => {
     fetchPrinters,
     fetchReports,
     fetchSettings,
-    getApiUrl,
   };
 };

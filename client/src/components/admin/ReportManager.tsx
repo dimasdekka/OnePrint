@@ -19,7 +19,6 @@ export default function ReportManager({
     setFilterFrom,
     filterTo,
     setFilterTo,
-    getApiUrl,
   } = adminData;
 
   const handleDeleteReport = (id: string) => {
@@ -29,7 +28,7 @@ export default function ReportManager({
       "Yakin ingin menghapus rekaman transaksi ini? Tindakan ini tidak bisa dibatalkan.",
       async () => {
         try {
-          await axios.delete(`${getApiUrl()}/api/admin/reports/${id}`);
+          await axios.delete(`/api/admin/reports/${id}`);
           setReports((prev: Report[]) => prev.filter((r) => r.id !== id));
           fetchReports();
           showModal("info", "Berhasil", "Laporan berhasil dihapus.");

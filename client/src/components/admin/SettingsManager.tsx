@@ -14,13 +14,12 @@ export default function SettingsManager({
     setPriceColor,
     loadingSettings,
     setLoadingSettings,
-    getApiUrl,
   } = adminData;
 
   const handleSaveSettings = async () => {
     setLoadingSettings(true);
     try {
-      await axios.post(`${getApiUrl()}/api/admin/settings`, {
+      await axios.post("/api/admin/settings", {
         pricePerPageBw: priceBw,
         pricePerPageColor: priceColor,
       });

@@ -28,8 +28,6 @@ async function initializeAdminUser() {
     }
   } catch (error) {
     logger.error("Failed to initialize admin user:", error);
-  } finally {
-    await prisma.$disconnect();
   }
 }
 

@@ -27,11 +27,7 @@ export default function UploadPage() {
 
       // Verify session with server
       try {
-        const apiProto = window.location.protocol;
-        const apiHost = window.location.hostname;
-        const apiUrl = `${apiProto}//${apiHost}:3001`;
-
-        const response = await axios.get(`${apiUrl}/api/verify-session/${sid}`);
+        const response = await axios.get(`/api/verify-session/${sid}`);
 
         if (response.data.valid) {
           setSessionId(sid);
@@ -77,15 +73,11 @@ export default function UploadPage() {
     setUploading(true);
 
     try {
-      const apiProto = window.location.protocol;
-      const apiHost = window.location.hostname;
-      const apiUrl = `${apiProto}//${apiHost}:3001`;
-
       const formData = new FormData();
       formData.append("file", selectedFile);
       formData.append("sessionId", sessionId);
 
-      const response = await axios.post(`${apiUrl}/api/upload`, formData, {
+      const response = await axios.post(`/api/upload`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
