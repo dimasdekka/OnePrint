@@ -1,11 +1,4 @@
-<<<<<<< HEAD
 "use client";
-=======
-import { useState, useEffect, useRef } from "react";
-import { createSocket } from "@/lib/socket";
-import axios from "axios";
-import type { KioskState } from "@/types/kiosk";
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
 
 import { useEffect, useCallback } from "react";
 import { kioskApi } from "@/lib/apiClient";
@@ -25,7 +18,6 @@ import { useKioskStore } from "@/store/kioskStore";
  * flashing before the first API response arrives.
  */
 export const useKioskSession = () => {
-<<<<<<< HEAD
   const {
     sessionId,
     pageCount,
@@ -53,13 +45,6 @@ export const useKioskSession = () => {
     setPrintProgress,
     setLoadingPayment,
   } = useKioskStore();
-=======
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [expiresAt, setExpiresAt] = useState<string | null>(null);
-  const [state, setState] = useState<KioskState>("waiting");
-  const kioskIdRef = useRef<string>("kiosk_" + Math.floor(Math.random() * 1000));
-  const [printersAvailable, setPrintersAvailable] = useState(true);
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
 
   // ── Printer availability check ─────────────────────────────────────────────
 
@@ -93,31 +78,7 @@ export const useKioskSession = () => {
   // ── Boot: printer check ────────────────────────────────────────────────────
 
   useEffect(() => {
-<<<<<<< HEAD
-=======
-    const checkPrinters = async () => {
-      try {
-        const { data } = await axios.get("/api/admin/printers");
-        const available =
-          data.length > 0 && data.some((p: any) => p.status === "Online");
-        setPrintersAvailable(available);
 
-        try {
-          const settingsObj = await axios.get("/api/admin/settings");
-          if (settingsObj.data) {
-            setPriceBw(settingsObj.data.pricePerPageBw || 1500);
-            setPriceColor(settingsObj.data.pricePerPageColor || 3000);
-          }
-        } catch (settingsError) {
-          console.error("Failed to fetch settings", settingsError);
-        }
-      } catch (e) {
-        console.error("Failed to check printers", e);
-        setPrintersAvailable(false);
-      }
-    };
-
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
     checkPrinters();
     const interval = setInterval(checkPrinters, 30_000);
     return () => clearInterval(interval);
@@ -157,75 +118,7 @@ export const useKioskSession = () => {
       }
     }
 
-<<<<<<< HEAD
     // Handle URL params (payment redirect)
-=======
-    const newSocket = createSocket();
-    
-    newSocket.on("connect", () => {
-      newSocket.emit(
-        "register_kiosk",
-        kioskIdRef.current,
-        savedFile ? existingSessionId : null,
-      );
-    });
-
-    newSocket.on(
-      "session_init",
-      (data: { sessionId: string; expiresAt: string }) => {
-        const currentFile = localStorage.getItem("oneprint_file");
-        if (!currentFile) {
-          setSessionId(data.sessionId);
-          setExpiresAt(data.expiresAt);
-          setState("waiting");
-        }
-        localStorage.setItem("oneprint_session", data.sessionId);
-        setSessionId(data.sessionId);
-        setExpiresAt(data.expiresAt);
-      },
-    );
-
-    newSocket.on(
-      "file-uploaded",
-      (data: { fileName: string; pageCount: number; filePath: string }) => {
-        setFileName(data.fileName);
-        setPageCount(data.pageCount);
-        setEstimatedPages(data.pageCount);
-        const normalizedPath = data.filePath.replace(/\\/g, "/");
-        setFilePath(normalizedPath);
-        setState("uploaded");
-
-        const fileData = { ...data, filePath: normalizedPath };
-        localStorage.setItem("oneprint_file", JSON.stringify(fileData));
-        const activeSession = localStorage.getItem("oneprint_session");
-        if (activeSession) localStorage.setItem("oneprint_session", activeSession);
-      },
-    );
-
-    newSocket.on("print_started", () => {
-      setState("printing");
-      setPrintProgress(0);
-      localStorage.removeItem("oneprint_file");
-      localStorage.removeItem("oneprint_settings");
-    });
-
-    newSocket.on(
-      "print_progress",
-      (data: { sessionId: string; percent: number }) => {
-        setPrintProgress(data.percent);
-      },
-    );
-
-    newSocket.on("print_complete", () => {
-      setState("waiting");
-      localStorage.removeItem("oneprint_session");
-      localStorage.removeItem("oneprint_amount");
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 3000);
-    });
-
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
     const urlParams = new URLSearchParams(window.location.search);
     const statusParam = urlParams.get("status");
 
@@ -314,24 +207,12 @@ export const useKioskSession = () => {
     });
 
     return () => {
-<<<<<<< HEAD
       socket.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Derived: estimated pages from page range ───────────────────────────────
-=======
-      newSocket.off("connect");
-      newSocket.off("session_init");
-      newSocket.off("file-uploaded");
-      newSocket.off("print_started");
-      newSocket.off("print_progress");
-      newSocket.off("print_complete");
-      newSocket.off("printer_update");
-    };
-  }, []);
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
 
   useEffect(() => {
     if (!pageRange.trim() || pageRange === "all") {
@@ -375,10 +256,7 @@ export const useKioskSession = () => {
 
     setLoadingPayment(true);
     try {
-<<<<<<< HEAD
       const apiUrl = getApiUrl();
-=======
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
       const pricePerPage = colorMode === "color" ? priceColor : priceBw;
       const totalAmount = copies * estimatedPages * pricePerPage;
 
@@ -390,14 +268,7 @@ export const useKioskSession = () => {
         pageCount: estimatedPages,
       };
 
-<<<<<<< HEAD
       const { data } = await kioskApi.post(`${apiUrl}/api/order/init`, paymentData);
-=======
-      const { data } = await axios.post(
-        "/api/tx/token",
-        paymentData,
-      );
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
 
       localStorage.setItem("oneprint_amount", totalAmount.toString());
       localStorage.setItem("oneprint_session", activeSession);
@@ -409,11 +280,7 @@ export const useKioskSession = () => {
       window.snap.pay(data.token, {
         onSuccess: async (result: unknown) => {
           console.log("Payment Success:", result);
-<<<<<<< HEAD
           await kioskApi.post(`${apiUrl}/api/order/complete`, {
-=======
-          await axios.post("/api/tx/complete", {
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
             sessionId: activeSession,
             orderId: data.orderId,
           });

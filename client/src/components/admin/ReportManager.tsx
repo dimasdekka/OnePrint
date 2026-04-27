@@ -19,33 +19,16 @@ interface ReportManagerProps {
 
 export default function ReportManager({ showModal, fetchReports }: ReportManagerProps) {
   const {
-<<<<<<< HEAD
     reports, summary, loadingReports,
     filterFrom, filterTo,
     setReports, setFilterFrom, setFilterTo,
   } = useAdminStore();
-=======
-    reports,
-    setReports,
-    summary,
-    loadingReports,
-    fetchReports,
-    filterFrom,
-    setFilterFrom,
-    filterTo,
-    setFilterTo,
-  } = adminData;
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
 
   const handleDeleteReport = (id: string) => {
     showModal("confirm", "Hapus Laporan", "Yakin ingin menghapus rekaman transaksi ini?",
       async () => {
         try {
-<<<<<<< HEAD
           await adminApi.delete(`${getApiUrl()}/api/admin/reports/${id}`);
-=======
-          await axios.delete(`/api/admin/reports/${id}`);
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
           setReports((prev: Report[]) => prev.filter((r) => r.id !== id));
           fetchReports();
           showModal("info", "Berhasil", "Laporan berhasil dihapus.");

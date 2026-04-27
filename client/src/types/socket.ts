@@ -9,16 +9,17 @@ export interface ServerToClientEvents {
     pageCount: number;
     filePath: string;
   }) => void;
-<<<<<<< HEAD
   print_started: (data: { sessionId: string }) => void;
-  print_complete: (data: { sessionId: string }) => void;
-=======
-  print_started: () => void;
   print_progress: (data: { sessionId: string; percent: number }) => void;
-  print_complete: () => void;
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
+  print_complete: (data: { sessionId: string }) => void;
   printer_update: () => void;
   user_connected: (data: { message: string }) => void;
+  admin_job_update: (data: {
+    printerName: string;
+    id: string;
+    fileName: string;
+    pages: number;
+  }) => void;
   error: (data: { message: string }) => void;
 }
 

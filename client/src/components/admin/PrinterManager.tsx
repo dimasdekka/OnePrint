@@ -24,14 +24,7 @@ interface PrinterManagerProps {
 export default function PrinterManager({ showModal, fetchPrinters }: PrinterManagerProps) {
   const {
     printers,
-<<<<<<< HEAD
-=======
-    fetchPrinters,
-    showAddPrinter,
-    setShowAddPrinter,
-    loadingPrinters,
-    setLoadingPrinters,
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
+
     osPrinters,
     selectedOsPrinter,
     loadingPrinters,
@@ -49,13 +42,9 @@ export default function PrinterManager({ showModal, fetchPrinters }: PrinterMana
     setShowAddPrinter(true);
     setLoadingPrinters(true);
     try {
-<<<<<<< HEAD
       const { data } = await adminApi.get<OsPrinter[]>(
         `${getApiUrl()}/api/system/printers`,
       );
-=======
-      const { data } = await axios.get("/api/system/printers");
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
       setOsPrinters(data);
       if (data.length > 0) setSelectedOsPrinter(data[0].Name);
     } catch {
@@ -72,19 +61,10 @@ export default function PrinterManager({ showModal, fetchPrinters }: PrinterMana
   const handleAddPrinter = async () => {
     if (!selectedOsPrinter) return;
     try {
-<<<<<<< HEAD
       const printerData = osPrinters.find((p) => p.Name === selectedOsPrinter);
       await adminApi.post(`${getApiUrl()}/api/admin/printers`, {
         name: printerData?.Name,
         driver: printerData?.DriverName,
-=======
-      const printerData = osPrinters.find(
-        (p: any) => p.Name === selectedOsPrinter,
-      );
-      await axios.post("/api/admin/printers", {
-        name: printerData.Name,
-        driver: printerData.DriverName,
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
       });
       fetchPrinters();
       setShowAddPrinter(false);
@@ -105,11 +85,7 @@ export default function PrinterManager({ showModal, fetchPrinters }: PrinterMana
       "Yakin ingin menghapus printer ini?",
       async () => {
         try {
-<<<<<<< HEAD
           await adminApi.delete(`${getApiUrl()}/api/admin/printers/${id}`);
-=======
-          await axios.delete(`/api/admin/printers/${id}`);
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
           fetchPrinters();
         } catch {
           showModal("alert", "Error", "Gagal menghapus printer");
@@ -125,17 +101,8 @@ export default function PrinterManager({ showModal, fetchPrinters }: PrinterMana
       `Kirim test print ke ${printerName}?`,
       async () => {
         try {
-<<<<<<< HEAD
           await adminApi.post(`${getApiUrl()}/api/admin/printers/${id}/test-print`);
           showModal("info", "Berhasil", "Test print terkirim! Cek printer Anda.");
-=======
-          await axios.post(`/api/admin/printers/${id}/test-print`);
-          showModal(
-            "info",
-            "Berhasil",
-            "Test print terkirim! Cek printer Anda.",
-          );
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
         } catch {
           showModal("alert", "Error", "Gagal mengirim test print");
         }
@@ -145,22 +112,11 @@ export default function PrinterManager({ showModal, fetchPrinters }: PrinterMana
 
   const handleSyncStatus = async (id: string, printerName: string) => {
     try {
-<<<<<<< HEAD
       const { data } = await adminApi.post(
         `${getApiUrl()}/api/admin/printers/${id}/sync-status`,
       );
       setPrinters((prev: Printer[]) =>
         prev.map((p) => (p.id === id ? { ...p, status: data.status } : p)),
-=======
-      const { data } = await axios.post(`/api/admin/printers/${id}/sync-status`);
-      adminData.setPrinters((prev: any) =>
-        prev.map((p: any) => (p.id === id ? { ...p, status: data.status } : p)),
-      );
-      showModal(
-        "info",
-        "Status Diperbarui",
-        `${printerName} sekarang ${data.status}`,
->>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
       );
       showModal("info", "Status Diperbarui", `${printerName} sekarang ${data.status}`);
     } catch {

@@ -12,6 +12,7 @@ export default function KioskPage() {
   const socketRef = useRef<any>(null);
 
   useEffect(() => {
+    const newSocket = createSocket();
     socketRef.current = newSocket;
 
     newSocket.on("connect", () => {
@@ -23,7 +24,7 @@ export default function KioskPage() {
       setSessionId(data.sessionId);
     });
     
-    newSocket.on("file-uploaded", (data) => {
+    newSocket.on("file-uploaded", (data: { fileName: string }) => {
       fileNameRef.current = data.fileName;
       setStatus(`File Uploaded: ${data.fileName}. Waiting for Payment...`);
     });
