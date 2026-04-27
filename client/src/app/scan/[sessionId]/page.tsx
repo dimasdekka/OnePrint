@@ -7,7 +7,10 @@ import { createSocket } from "@/lib/socket";
 import { API_BASE_URL } from "@/lib/constants";
 
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
 export default function ScanPage({
   params,
 }: {

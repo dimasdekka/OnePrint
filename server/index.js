@@ -64,11 +64,18 @@ const gracefulShutdown = async () => {
   }, 10000);
 };
 
-process.on("SIGTERM", gracefulShutdown);
-process.on("SIGINT", gracefulShutdown);
+process.on("SIGTERM", () => {
+  logger.info("Received SIGTERM signal");
+  gracefulShutdown();
+});
+process.on("SIGINT", () => {
+  logger.info("Received SIGINT signal");
+  gracefulShutdown();
+});
 
 // Handle uncaught exceptions
 process.on("uncaughtException", (error) => {
+  console.error("Uncaught Exception directly:", error);
   logger.error("Uncaught Exception", {
     error: error.message,
     stack: error.stack,
@@ -77,6 +84,7 @@ process.on("uncaughtException", (error) => {
 });
 
 process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection directly:", reason);
   logger.error("Unhandled Rejection", { reason, promise });
   gracefulShutdown();
 });

@@ -2,14 +2,13 @@
  * Client-side constants
  */
 
-// API Configuration
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  (typeof window !== "undefined"
-    ? `${window.location.protocol}//${window.location.hostname}:3001`
-    : "http://localhost:3001");
+// API Configuration (empty allows relative paths and uses Next.js proxy rewrite)
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
-export const SOCKET_URL = API_BASE_URL;
+export const SOCKET_URL =
+  typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:3001`
+    : "http://localhost:3001";
 
 // Pricing
 export const PRICE_PER_PAGE = 1500;

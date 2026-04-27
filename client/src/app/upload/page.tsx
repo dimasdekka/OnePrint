@@ -27,11 +27,15 @@ export default function UploadPage() {
 
       // Verify session with server
       try {
+<<<<<<< HEAD
         const apiProto = window.location.protocol;
         const apiHost = window.location.hostname;
         const apiUrl = `${apiProto}//${apiHost}:3001`;
 
         const response = await kioskApi.get(`${apiUrl}/api/verify-session/${sid}`);
+=======
+        const response = await axios.get(`/api/verify-session/${sid}`);
+>>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
 
         if (response.data.valid) {
           setSessionId(sid);
@@ -77,15 +81,15 @@ export default function UploadPage() {
     setUploading(true);
 
     try {
-      const apiProto = window.location.protocol;
-      const apiHost = window.location.hostname;
-      const apiUrl = `${apiProto}//${apiHost}:3001`;
-
       const formData = new FormData();
       formData.append("file", selectedFile);
       formData.append("sessionId", sessionId);
 
+<<<<<<< HEAD
       const response = await kioskApi.post(`${apiUrl}/api/upload`, formData, {
+=======
+      const response = await axios.post(`/api/upload`, formData, {
+>>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
         headers: { "Content-Type": "multipart/form-data" },
       });
 

@@ -1,5 +1,6 @@
 "use client";
 
+<<<<<<< HEAD
 import { adminApi } from "@/lib/apiClient";
 import { useAdminStore } from "@/store/adminStore";
 import { getApiUrl } from "@/lib/getApiUrl";
@@ -15,11 +16,32 @@ interface SettingsManagerProps {
 export default function SettingsManager({ showModal }: SettingsManagerProps) {
   const { priceBw, priceColor, loadingSettings, setPriceBw, setPriceColor, setLoadingSettings } =
     useAdminStore();
+=======
+export default function SettingsManager({
+  adminData,
+  showModal,
+}: {
+  adminData: any;
+  showModal: any;
+}) {
+  const {
+    priceBw,
+    setPriceBw,
+    priceColor,
+    setPriceColor,
+    loadingSettings,
+    setLoadingSettings,
+  } = adminData;
+>>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
 
   const handleSaveSettings = async () => {
     setLoadingSettings(true);
     try {
+<<<<<<< HEAD
       await adminApi.post(`${getApiUrl()}/api/admin/settings`, {
+=======
+      await axios.post("/api/admin/settings", {
+>>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
         pricePerPageBw: priceBw,
         pricePerPageColor: priceColor,
       });

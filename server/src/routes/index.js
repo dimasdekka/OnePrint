@@ -26,7 +26,7 @@ router.get("/", (req, res) => {
 router.use("/api", authRoutes);
 router.use("/api", sessionRoutes);
 router.use("/api", uploadRoutes);
-router.use("/api/order", paymentRoutes);
+router.use("/api/tx", paymentRoutes);
 router.use("/api", adminRoutes);
 
 module.exports = router;

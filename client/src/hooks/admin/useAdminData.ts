@@ -2,11 +2,17 @@
 
 import { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+<<<<<<< HEAD
 import { adminApi } from "@/lib/apiClient";
 import { getApiUrl } from "@/lib/getApiUrl";
 import { createSocket } from "@/lib/socket";
 import { useAdminStore } from "@/store/adminStore";
 import type { Printer, Report } from "@/types/admin";
+=======
+import { io } from "socket.io-client";
+import { SOCKET_URL } from "@/lib/constants";
+import type { Printer, Report, Summary } from "@/types/admin";
+>>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
 
 /**
  * useAdminActions
@@ -30,6 +36,7 @@ export const useAdminActions = () => {
     setPriceColor,
   } = useAdminStore();
 
+<<<<<<< HEAD
   // ── Fetch helpers ──────────────────────────────────────────────────────────
 
   const fetchPrinters = useCallback(async () => {
@@ -37,6 +44,23 @@ export const useAdminActions = () => {
       const { data } = await adminApi.get<Printer[]>(
         `${getApiUrl()}/api/admin/printers`,
       );
+=======
+  // Reports
+  const [reports, setReports] = useState<Report[]>([]);
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
+
+  // Settings
+  const [priceBw, setPriceBw] = useState(1500);
+  const [priceColor, setPriceColor] = useState(3000);
+  const [loadingSettings, setLoadingSettings] = useState(false);
+
+  const fetchPrinters = useCallback(async () => {
+    try {
+      const { data } = await axios.get("/api/admin/printers");
+>>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
       setPrinters(data);
     } catch (e) {
       console.error("Failed to fetch printers:", e);
@@ -51,8 +75,13 @@ export const useAdminActions = () => {
       if (filterTo) params.append("to", filterTo);
 
       const [repRes, sumRes] = await Promise.all([
+<<<<<<< HEAD
         adminApi.get(`${getApiUrl()}/api/admin/reports?${params}`),
         adminApi.get(`${getApiUrl()}/api/admin/reports/summary`),
+=======
+        axios.get(`/api/admin/reports?${params}`),
+        axios.get("/api/admin/reports/summary"),
+>>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
       ]);
 
       setReports(repRes.data);
@@ -66,7 +95,11 @@ export const useAdminActions = () => {
 
   const fetchSettings = useCallback(async () => {
     try {
+<<<<<<< HEAD
       const { data } = await adminApi.get(`${getApiUrl()}/api/admin/settings`);
+=======
+      const { data } = await axios.get("/api/admin/settings");
+>>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
       if (data) {
         setPriceBw(data.pricePerPageBw ?? 1500);
         setPriceColor(data.pricePerPageColor ?? 3000);
@@ -79,6 +112,7 @@ export const useAdminActions = () => {
   // ── Socket setup ───────────────────────────────────────────────────────────
 
   const setupSocket = useCallback(() => {
+<<<<<<< HEAD
     const socket = createSocket();
 
     socket.on(
@@ -111,6 +145,11 @@ export const useAdminActions = () => {
         setReports((prev: Report[]) => [newReport, ...prev]);
       },
     );
+=======
+    const socket = io(SOCKET_URL, {
+      transports: ["websocket", "polling"],
+    });
+>>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
 
 
     socket.on("printer_update", () => {
@@ -125,7 +164,11 @@ export const useAdminActions = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+<<<<<<< HEAD
         await adminApi.get(`${getApiUrl()}/api/auth/me`);
+=======
+        await axios.get("/api/auth/me");
+>>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
         setIsAuthorized(true);
         fetchPrinters();
         fetchReports();
@@ -146,8 +189,49 @@ export const useAdminActions = () => {
       clearInterval(syncInterval);
       cleanupSocket();
     };
+<<<<<<< HEAD
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { fetchPrinters, fetchReports, fetchSettings };
+=======
+  }, [
+    fetchPrinters,
+    fetchReports,
+    fetchSettings,
+    fetchSettings,
+    router,
+    setupSocket,
+  ]);
+
+  return {
+    isAuthorized,
+    authLoading,
+    printers,
+    setPrinters,
+    osPrinters,
+    setOsPrinters,
+    selectedOsPrinter,
+    setSelectedOsPrinter,
+    loadingPrinters,
+    setLoadingPrinters,
+    reports,
+    setReports,
+    summary,
+    loadingReports,
+    filterFrom,
+    setFilterFrom,
+    filterTo,
+    setFilterTo,
+    priceBw,
+    setPriceBw,
+    priceColor,
+    setPriceColor,
+    loadingSettings,
+    setLoadingSettings,
+    fetchPrinters,
+    fetchReports,
+    fetchSettings,
+  };
+>>>>>>> 51fa0337771e8e1ec249745c7bbb0e4b1d9e20ce
 };

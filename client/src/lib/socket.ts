@@ -14,15 +14,17 @@ export type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 /**
  * Create a type-safe Socket.IO client instance
  */
+let globalSocket: TypedSocket | null = null;
 export const createSocket = (): TypedSocket => {
-  const socket = io(SOCKET_URL, {
-    transports: ["websocket", "polling"],
-    reconnection: true,
-    reconnectionDelay: 1000,
-    reconnectionAttempts: 5,
-  }) as TypedSocket;
-
-  return socket;
+  if (!globalSocket) {
+    globalSocket = io(SOCKET_URL, {
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5,
+    }) as TypedSocket;
+  }
+  return globalSocket;
 };
 
 /**
