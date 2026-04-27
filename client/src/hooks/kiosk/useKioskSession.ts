@@ -55,7 +55,12 @@ export const useKioskSession = () => {
     try {
       const apiUrl = getApiUrl();
       const { data } = await kioskApi.get(`${apiUrl}/api/admin/printers`);
-      const available = data.length > 0;
+      // Only count printers that are actually online and connected.
+      // Server uses PascalCase: "Online" / "Offline" (see server/src/utils/constants.js)
+      const onlinePrinters = (data as Array<{ status: string; isConnected: boolean }>).filter(
+        (p) => p.status === "Online" && p.isConnected === true,
+      );
+      const available = onlinePrinters.length > 0;
       setPrintersAvailable(available);
 
       try {
@@ -209,8 +214,10 @@ export const useKioskSession = () => {
       kioskApi
         .get(`${apiUrl}/api/admin/printers`)
         .then(({ data }) => {
-          const available = data.length > 0;
-          setPrintersAvailable(available);
+          const onlinePrinters = (data as Array<{ status: string; isConnected: boolean }>).filter(
+            (p) => p.status === "Online" && p.isConnected === true,
+          );
+          setPrintersAvailable(onlinePrinters.length > 0);
         })
         .catch(() => {/* ignore transient errors */});
     };
