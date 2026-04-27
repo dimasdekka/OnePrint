@@ -1,21 +1,21 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { kioskApi } from "@/lib/apiClient";
 import { getApiUrl } from "@/lib/getApiUrl";
 import { createSocket } from "@/lib/socket";
 import { useKioskStore } from "@/store/kioskStore";
 
-
-
 /**
  * useKioskSession
  *
- * Manages all kiosk socket connections and side-effects.
- * State lives in `useKioskStore` (Zustand). Components subscribe individually.
- *
- * Bug fixed: printerLoading prevents the "Service Offline" overlay from
- * flashing before the first API response arrives.
+ * Key architectural decisions:
+ * 1. socketRef stores the singleton so all actions use the SAME socket with all listeners.
+ * 2. We do NOT call socket.disconnect() in cleanup — Socket.IO's socket.disconnect()
+ *    sets socket.active = false which permanently disables auto-reconnect.
+ *    Instead we only remove our event listeners on cleanup.
+ * 3. reRegisterKiosk always reads fresh localStorage values (no stale closure).
+ * 4. The "connect" handler also reads fresh localStorage so reconnects work correctly.
  */
 export const useKioskSession = () => {
   const {
@@ -44,7 +44,10 @@ export const useKioskSession = () => {
     setShowResetModal,
     setPrintProgress,
     setLoadingPayment,
+    resetSession,
   } = useKioskStore();
+
+  const socketRef = useRef<ReturnType<typeof createSocket> | null>(null);
 
   // ── Printer availability check ─────────────────────────────────────────────
 
@@ -52,8 +55,6 @@ export const useKioskSession = () => {
     try {
       const apiUrl = getApiUrl();
       const { data } = await kioskApi.get(`${apiUrl}/api/admin/printers`);
-      // Relax printer availability check to prevent random "Service Offline" issues
-      // caused by flaky OS WMI queries. As long as a printer is registered, allow kiosk usage.
       const available = data.length > 0;
       setPrintersAvailable(available);
 
@@ -70,15 +71,11 @@ export const useKioskSession = () => {
       console.error("Failed to check printers:", err);
       setPrintersAvailable(false);
     } finally {
-      // Always clear loading so the overlay renders correctly after first check
       setPrinterLoading(false);
     }
   }, [setPrinterLoading, setPriceBw, setPriceColor, setPrintersAvailable]);
 
-  // ── Boot: printer check ────────────────────────────────────────────────────
-
   useEffect(() => {
-
     checkPrinters();
     const interval = setInterval(checkPrinters, 30_000);
     return () => clearInterval(interval);
@@ -88,10 +85,10 @@ export const useKioskSession = () => {
   // ── Boot: socket + restore saved session ───────────────────────────────────
 
   useEffect(() => {
+    // ── Restore localStorage state ──
     const existingSessionId = localStorage.getItem("oneprint_session");
     const savedFile = localStorage.getItem("oneprint_file");
 
-    // Restore file state from localStorage
     if (savedFile) {
       try {
         const fileData = JSON.parse(savedFile);
@@ -118,7 +115,7 @@ export const useKioskSession = () => {
       }
     }
 
-    // Handle URL params (payment redirect)
+    // ── Handle URL params ──
     const urlParams = new URLSearchParams(window.location.search);
     const statusParam = urlParams.get("status");
 
@@ -139,15 +136,22 @@ export const useKioskSession = () => {
       }
     }
 
-    // Socket connection
+    // ── Socket setup ──
     const socket = createSocket();
+    socketRef.current = socket;
 
-    socket.on("connect", () => {
+    // "connect" handler reads FRESH localStorage every time (no stale closure).
+    // This is critical so reconnects after confirmReset work correctly.
+    const handleConnect = () => {
       const kioskId = "kiosk_" + Math.floor(Math.random() * 1000);
-      socket.emit("register_kiosk", kioskId, savedFile ? existingSessionId : null);
-    });
+      const freshFile = localStorage.getItem("oneprint_file");
+      const freshSession = localStorage.getItem("oneprint_session");
+      console.log("[Socket] connected, registering kiosk", { kioskId, freshSession: freshFile ? freshSession : null });
+      socket.emit("register_kiosk", kioskId, freshFile ? freshSession : null);
+    };
 
-    socket.on("session_init", (data: { sessionId: string; expiresAt: string }) => {
+    const handleSessionInit = (data: { sessionId: string; expiresAt: string }) => {
+      console.log("[Socket] session_init received", data.sessionId);
       const currentFile = localStorage.getItem("oneprint_file");
       if (!currentFile) {
         setKioskState("waiting");
@@ -155,47 +159,52 @@ export const useKioskSession = () => {
       setSessionId(data.sessionId);
       setExpiresAt(data.expiresAt);
       localStorage.setItem("oneprint_session", data.sessionId);
-    });
+    };
 
-    socket.on(
-      "file-uploaded",
-      (data: { fileName: string; pageCount: number; filePath: string }) => {
-        console.log("SOCKET: file-uploaded received!", data);
-        const normalizedPath = data.filePath.replace(/\\/g, "/");
-        setFileName(data.fileName);
-        setPageCount(data.pageCount);
-        setEstimatedPages(data.pageCount);
-        setFilePath(normalizedPath);
-        setKioskState("uploaded");
+    const handleFileUploaded = (data: { fileName: string; pageCount: number; filePath: string }) => {
+      console.log("SOCKET: file-uploaded received!", data);
+      const normalizedPath = data.filePath.replace(/\\/g, "/");
+      setFileName(data.fileName);
+      setPageCount(data.pageCount);
+      setEstimatedPages(data.pageCount);
+      setFilePath(normalizedPath);
+      setKioskState("uploaded");
 
-        const fileData = { ...data, filePath: normalizedPath };
-        localStorage.setItem("oneprint_file", JSON.stringify(fileData));
-        const currentSession = localStorage.getItem("oneprint_session");
-        if (currentSession) localStorage.setItem("oneprint_session", currentSession);
-      },
-    );
+      const fileData = { ...data, filePath: normalizedPath };
+      localStorage.setItem("oneprint_file", JSON.stringify(fileData));
+      const currentSession = localStorage.getItem("oneprint_session");
+      if (currentSession) localStorage.setItem("oneprint_session", currentSession);
+    };
 
-    socket.on("print_started", () => {
+    const handlePrintStarted = () => {
       setKioskState("printing");
       setPrintProgress(0);
       localStorage.removeItem("oneprint_file");
       localStorage.removeItem("oneprint_settings");
-    });
+    };
 
-    socket.on("print_progress", (data: { sessionId: string; percent: number }) => {
+    const handlePrintProgress = (data: { sessionId: string; percent: number }) => {
       setPrintProgress(data.percent);
-    });
+    };
 
-    socket.on("print_complete", () => {
-      setKioskState("waiting");
+    const handlePrintComplete = () => {
       localStorage.removeItem("oneprint_session");
       localStorage.removeItem("oneprint_amount");
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 3000);
-    });
+      localStorage.removeItem("oneprint_file");
+      localStorage.removeItem("oneprint_settings");
 
-    socket.on("printer_update", () => {
+      setPrintProgress(100);
+      setTimeout(() => {
+        resetSession();
+        // Reconnect to get a fresh session — equivalent to hard refresh socket handshake
+        if (socketRef.current) {
+          socketRef.current.disconnect();
+          socketRef.current.connect();
+        }
+      }, 3000);
+    };
+
+    const handlePrinterUpdate = () => {
       const apiUrl = getApiUrl();
       kioskApi
         .get(`${apiUrl}/api/admin/printers`)
@@ -204,10 +213,27 @@ export const useKioskSession = () => {
           setPrintersAvailable(available);
         })
         .catch(() => {/* ignore transient errors */});
-    });
+    };
 
+    socket.on("connect", handleConnect);
+    socket.on("session_init", handleSessionInit);
+    socket.on("file-uploaded", handleFileUploaded);
+    socket.on("print_started", handlePrintStarted);
+    socket.on("print_progress", handlePrintProgress);
+    socket.on("print_complete", handlePrintComplete);
+    socket.on("printer_update", handlePrinterUpdate);
+
+    // IMPORTANT: Do NOT call socket.disconnect() here.
+    // socket.disconnect() sets socket.active = false which permanently disables
+    // auto-reconnect. Instead, only remove our specific listeners.
     return () => {
-      socket.disconnect();
+      socket.off("connect", handleConnect);
+      socket.off("session_init", handleSessionInit);
+      socket.off("file-uploaded", handleFileUploaded);
+      socket.off("print_started", handlePrintStarted);
+      socket.off("print_progress", handlePrintProgress);
+      socket.off("print_complete", handlePrintComplete);
+      socket.off("printer_update", handlePrinterUpdate);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -249,6 +275,28 @@ export const useKioskSession = () => {
   }, [pageRange, pageCount, setEstimatedPages]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
+
+  /**
+   * Re-register kiosk by forcing a fresh socket disconnect→connect cycle.
+   * This is the ONLY reliable way to get a new session_init from the server,
+   * equivalent to what happens on hard refresh.
+   *
+   * socket.connect() re-enables the socket and triggers "connect" event,
+   * which calls our handleConnect handler that emits register_kiosk.
+   */
+  const reRegisterKiosk = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+
+    console.log("[reRegisterKiosk] forcing reconnect, connected=", socket.connected);
+
+    if (socket.connected) {
+      // Briefly disconnect then reconnect to trigger fresh "connect" event
+      socket.disconnect();
+    }
+    // socket.connect() re-enables socket.active and initiates connection
+    socket.connect();
+  }, []);
 
   const handlePayment = useCallback(async () => {
     const activeSession = sessionId ?? localStorage.getItem("oneprint_session");
@@ -325,12 +373,20 @@ export const useKioskSession = () => {
   }, [setShowResetModal]);
 
   const confirmReset = useCallback(() => {
+    // Close Midtrans Snap popup if it's open
+    if (typeof window !== "undefined" && window.snap?.hide) {
+      try { window.snap.hide(); } catch { /* ignore */ }
+    }
+    // Clear localStorage
     localStorage.removeItem("oneprint_file");
     localStorage.removeItem("oneprint_settings");
     localStorage.removeItem("oneprint_amount");
     localStorage.removeItem("oneprint_session");
-    window.location.reload();
-  }, []);
+    // Soft-reset Zustand state
+    resetSession();
+    // Reconnect socket → triggers "connect" → emits register_kiosk → gets session_init
+    reRegisterKiosk();
+  }, [resetSession, reRegisterKiosk]);
 
-  return { handlePayment, handleReset, confirmReset };
+  return { handlePayment, handleReset, confirmReset, reRegisterKiosk };
 };

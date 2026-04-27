@@ -40,7 +40,12 @@ export default function KioskPage() {
     newSocket.on("print_complete", () => {
       setStatus("Printing Finished. Please collect your document.");
       setTimeout(() => {
-        window.location.reload();
+        // Soft reset: clear session so QR is re-generated without page reload
+        fileNameRef.current = null;
+        setSessionId(null);
+        setStatus("Initializing System...");
+        // Re-register kiosk to get a fresh session from server
+        newSocket.emit("register_kiosk", kioskIdRef.current);
       }, 5000);
     });
 

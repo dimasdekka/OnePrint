@@ -1,5 +1,8 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { useKioskStore } from "@/store/kioskStore";
 
 export const CountdownTimer = ({
   targetDate,
@@ -36,10 +39,21 @@ export const CountdownTimer = ({
 export default function WaitingScreen({
   sessionId,
   expiresAt,
+  onQrExpire,
 }: {
   sessionId: string;
   expiresAt: string | null;
+  onQrExpire: () => void;
 }) {
+  const { resetSession } = useKioskStore();
+
+  const handleQrExpire = () => {
+    // Soft reset state — do NOT reload the page so any open Snap popup is unaffected
+    resetSession();
+    // Delegate re-registration to the hook (uses socketRef with all listeners)
+    onQrExpire();
+  };
+
   const qrUrl = sessionId
     ? `${window.location.protocol}//${window.location.host}/upload?session=${sessionId}`
     : "";
@@ -151,7 +165,7 @@ export default function WaitingScreen({
             QR Code berakhir dalam{" "}
             <CountdownTimer
               targetDate={expiresAt}
-              onExpire={() => window.location.reload()}
+              onExpire={handleQrExpire}
             />
           </div>
         )}

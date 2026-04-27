@@ -56,6 +56,9 @@ interface KioskActions {
   setShowResetModal: (v: boolean) => void;
   setPrintProgress: (v: number) => void;
   setLoadingPayment: (v: boolean) => void;
+
+  /** Soft-reset all session state back to initial (no page reload) */
+  resetSession: () => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -107,4 +110,21 @@ export const useKioskStore = create<KioskStoreState & KioskActions>((set) => ({
   setShowResetModal: (v) => set({ showResetModal: v }),
   setPrintProgress: (v) => set({ printProgress: v }),
   setLoadingPayment: (v) => set({ loadingPayment: v }),
+
+  resetSession: () =>
+    set({
+      sessionId: null,
+      expiresAt: null,
+      kioskState: "waiting",
+      fileName: null,
+      pageCount: 1,
+      filePath: null,
+      copies: 1,
+      colorMode: "color",
+      pageRange: "all",
+      estimatedPages: 1,
+      showResetModal: false,
+      printProgress: 0,
+      loadingPayment: false,
+    }),
 }));
