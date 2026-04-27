@@ -60,3 +60,11 @@ logs/
 # OS
 Thumbs.db
 .DS_Store
+
+# Agent
+.agent/
+
+# Test scripts
+test-*.js
+test_screenshots/
+dummy.pdf

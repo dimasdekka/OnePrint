@@ -155,6 +155,8 @@ export default function WaitingScreen({
             />
           </div>
         )}
+
+
       </div>
     </div>
   );

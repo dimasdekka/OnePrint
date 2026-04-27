@@ -1,33 +1,49 @@
-import { useState } from "react";
-import axios from "axios";
-import type { Printer } from "@/types/admin";
+"use client";
 
-export default function PrinterManager({
-  adminData,
-  showModal,
-}: {
-  adminData: any;
-  showModal: any;
-}) {
+import { adminApi } from "@/lib/apiClient";
+import { useAdminStore } from "@/store/adminStore";
+import { getApiUrl } from "@/lib/getApiUrl";
+import type { Printer } from "@/types/admin";
+import type { OsPrinter } from "@/store/adminStore";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface PrinterManagerProps {
+  showModal: (
+    type: "confirm" | "alert" | "info",
+    title: string,
+    message: string,
+    onConfirm?: () => void | Promise<void>,
+    onCancel?: () => void | Promise<void>,
+  ) => void;
+  fetchPrinters: () => Promise<void>;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function PrinterManager({ showModal, fetchPrinters }: PrinterManagerProps) {
   const {
     printers,
-    fetchPrinters,
-    getApiUrl,
-    showAddPrinter,
-    setShowAddPrinter,
-    loadingPrinters,
-    setLoadingPrinters,
     osPrinters,
-    setOsPrinters,
     selectedOsPrinter,
+    loadingPrinters,
+    showAddPrinter,
+    setPrinters,
+    setOsPrinters,
     setSelectedOsPrinter,
-  } = adminData;
+    setLoadingPrinters,
+    setShowAddPrinter,
+  } = useAdminStore();
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
   const openAddPrinterModal = async () => {
     setShowAddPrinter(true);
     setLoadingPrinters(true);
     try {
-      const { data } = await axios.get(`${getApiUrl()}/api/system/printers`);
+      const { data } = await adminApi.get<OsPrinter[]>(
+        `${getApiUrl()}/api/system/printers`,
+      );
       setOsPrinters(data);
       if (data.length > 0) setSelectedOsPrinter(data[0].Name);
     } catch {
@@ -44,12 +60,10 @@ export default function PrinterManager({
   const handleAddPrinter = async () => {
     if (!selectedOsPrinter) return;
     try {
-      const printerData = osPrinters.find(
-        (p: any) => p.Name === selectedOsPrinter,
-      );
-      await axios.post(`${getApiUrl()}/api/admin/printers`, {
-        name: printerData.Name,
-        driver: printerData.DriverName,
+      const printerData = osPrinters.find((p) => p.Name === selectedOsPrinter);
+      await adminApi.post(`${getApiUrl()}/api/admin/printers`, {
+        name: printerData?.Name,
+        driver: printerData?.DriverName,
       });
       fetchPrinters();
       setShowAddPrinter(false);
@@ -70,7 +84,7 @@ export default function PrinterManager({
       "Yakin ingin menghapus printer ini?",
       async () => {
         try {
-          await axios.delete(`${getApiUrl()}/api/admin/printers/${id}`);
+          await adminApi.delete(`${getApiUrl()}/api/admin/printers/${id}`);
           fetchPrinters();
         } catch {
           showModal("alert", "Error", "Gagal menghapus printer");
@@ -86,14 +100,8 @@ export default function PrinterManager({
       `Kirim test print ke ${printerName}?`,
       async () => {
         try {
-          await axios.post(
-            `${getApiUrl()}/api/admin/printers/${id}/test-print`,
-          );
-          showModal(
-            "info",
-            "Berhasil",
-            "Test print terkirim! Cek printer Anda.",
-          );
+          await adminApi.post(`${getApiUrl()}/api/admin/printers/${id}/test-print`);
+          showModal("info", "Berhasil", "Test print terkirim! Cek printer Anda.");
         } catch {
           showModal("alert", "Error", "Gagal mengirim test print");
         }
@@ -103,17 +111,13 @@ export default function PrinterManager({
 
   const handleSyncStatus = async (id: string, printerName: string) => {
     try {
-      const { data } = await axios.post(
+      const { data } = await adminApi.post(
         `${getApiUrl()}/api/admin/printers/${id}/sync-status`,
       );
-      adminData.setPrinters((prev: any) =>
-        prev.map((p: any) => (p.id === id ? { ...p, status: data.status } : p)),
+      setPrinters((prev: Printer[]) =>
+        prev.map((p) => (p.id === id ? { ...p, status: data.status } : p)),
       );
-      showModal(
-        "info",
-        "Status Diperbarui",
-        `${printerName} sekarang ${data.status}`,
-      );
+      showModal("info", "Status Diperbarui", `${printerName} sekarang ${data.status}`);
     } catch {
       showModal("alert", "Error", "Gagal sinkronisasi status printer");
     }
@@ -126,9 +130,7 @@ export default function PrinterManager({
       "Enable Dummy Printer (Online)?\nKlik Cancel untuk Disable (Offline).",
       async () => {
         try {
-          await axios.post(`${getApiUrl()}/api/admin/dummy-printer`, {
-            action: "add",
-          });
+          await adminApi.post(`${getApiUrl()}/api/admin/dummy-printer`, { action: "add" });
           fetchPrinters();
           showModal("info", "Berhasil", "Dummy Printer sekarang Online.");
         } catch {
@@ -137,9 +139,7 @@ export default function PrinterManager({
       },
       async () => {
         try {
-          await axios.post(`${getApiUrl()}/api/admin/dummy-printer`, {
-            action: "remove",
-          });
+          await adminApi.post(`${getApiUrl()}/api/admin/dummy-printer`, { action: "remove" });
           fetchPrinters();
           showModal("info", "Berhasil", "Dummy Printer sekarang Offline.");
         } catch {
@@ -148,6 +148,8 @@ export default function PrinterManager({
       },
     );
   };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -187,9 +189,7 @@ export default function PrinterManager({
 
       {showAddPrinter && (
         <div className="bg-white p-6 rounded-xl shadow-sm border border-black mb-6">
-          <h3 className="font-bold text-lg mb-4 text-black">
-            Tambah Printer Baru
-          </h3>
+          <h3 className="font-bold text-lg mb-4 text-black">Tambah Printer Baru</h3>
           <div className="flex flex-col gap-4">
             {loadingPrinters ? (
               <p className="text-gray-500 animate-pulse text-sm">
@@ -205,7 +205,7 @@ export default function PrinterManager({
                   {osPrinters.length === 0 && (
                     <option value="">No printers found</option>
                   )}
-                  {osPrinters.map((p: any) => (
+                  {osPrinters.map((p) => (
                     <option key={p.Name} value={p.Name}>
                       {p.Name} ({p.DriverName})
                     </option>

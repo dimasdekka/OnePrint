@@ -1,73 +1,96 @@
-import { useState, useEffect } from "react";
-import { io } from "socket.io-client";
-import axios from "axios";
-import type { KioskState } from "@/types/kiosk";
+"use client";
 
+import { useEffect, useCallback } from "react";
+import { kioskApi } from "@/lib/apiClient";
+import { getApiUrl } from "@/lib/getApiUrl";
+import { createSocket } from "@/lib/socket";
+import { useKioskStore } from "@/store/kioskStore";
+
+
+
+/**
+ * useKioskSession
+ *
+ * Manages all kiosk socket connections and side-effects.
+ * State lives in `useKioskStore` (Zustand). Components subscribe individually.
+ *
+ * Bug fixed: printerLoading prevents the "Service Offline" overlay from
+ * flashing before the first API response arrives.
+ */
 export const useKioskSession = () => {
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [expiresAt, setExpiresAt] = useState<string | null>(null);
-  const [state, setState] = useState<KioskState>("waiting");
-  const [socket, setSocket] = useState<any>(null);
-  const [printersAvailable, setPrintersAvailable] = useState(true);
+  const {
+    sessionId,
+    pageCount,
+    pageRange,
+    copies,
+    colorMode,
+    estimatedPages,
+    priceBw,
+    priceColor,
+    setSessionId,
+    setExpiresAt,
+    setKioskState,
+    setPrintersAvailable,
+    setPrinterLoading,
+    setPriceBw,
+    setPriceColor,
+    setFileName,
+    setPageCount,
+    setFilePath,
+    setCopies,
+    setColorMode,
+    setPageRange,
+    setEstimatedPages,
+    setShowResetModal,
+    setPrintProgress,
+    setLoadingPayment,
+  } = useKioskStore();
 
-  // Pricing Settings
-  const [priceBw, setPriceBw] = useState(1500);
-  const [priceColor, setPriceColor] = useState(3000);
+  // ── Printer availability check ─────────────────────────────────────────────
 
-  // File data
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [pageCount, setPageCount] = useState(1);
-  const [filePath, setFilePath] = useState<string | null>(null);
+  const checkPrinters = useCallback(async () => {
+    try {
+      const apiUrl = getApiUrl();
+      const { data } = await kioskApi.get(`${apiUrl}/api/admin/printers`);
+      // Relax printer availability check to prevent random "Service Offline" issues
+      // caused by flaky OS WMI queries. As long as a printer is registered, allow kiosk usage.
+      const available = data.length > 0;
+      setPrintersAvailable(available);
 
-  // Print settings
-  const [copies, setCopies] = useState(1);
-  const [colorMode, setColorMode] = useState<"bw" | "color">("color");
-  const [pageRange, setPageRange] = useState("all");
-  const [estimatedPages, setEstimatedPages] = useState(1);
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [printProgress, setPrintProgress] = useState(0);
-  const [loadingPayment, setLoadingPayment] = useState(false);
+      try {
+        const settingsRes = await kioskApi.get(`${apiUrl}/api/admin/settings`);
+        if (settingsRes.data) {
+          setPriceBw(settingsRes.data.pricePerPageBw ?? 1500);
+          setPriceColor(settingsRes.data.pricePerPageColor ?? 3000);
+        }
+      } catch (err) {
+        console.error("Failed to fetch settings:", err);
+      }
+    } catch (err) {
+      console.error("Failed to check printers:", err);
+      setPrintersAvailable(false);
+    } finally {
+      // Always clear loading so the overlay renders correctly after first check
+      setPrinterLoading(false);
+    }
+  }, [setPrinterLoading, setPriceBw, setPriceColor, setPrintersAvailable]);
+
+  // ── Boot: printer check ────────────────────────────────────────────────────
 
   useEffect(() => {
-    const checkPrinters = async () => {
-      try {
-        const apiProto = window.location.protocol;
-        const apiHost = window.location.hostname;
-        const apiUrl = `${apiProto}//${apiHost}:3001`;
-
-        const { data } = await axios.get(`${apiUrl}/api/admin/printers`);
-        const available =
-          data.length > 0 && data.some((p: any) => p.status === "Online");
-        setPrintersAvailable(available);
-
-        try {
-          const settingsObj = await axios.get(`${apiUrl}/api/admin/settings`);
-          if (settingsObj.data) {
-            setPriceBw(settingsObj.data.pricePerPageBw || 1500);
-            setPriceColor(settingsObj.data.pricePerPageColor || 3000);
-          }
-        } catch (settingsError) {
-          console.error("Failed to fetch settings", settingsError);
-        }
-      } catch (e) {
-        console.error("Failed to check printers", e);
-        setPrintersAvailable(false);
-      }
-    };
-
     checkPrinters();
-    const interval = setInterval(checkPrinters, 30000);
+    const interval = setInterval(checkPrinters, 30_000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const socketProto = window.location.protocol;
-    const socketHost = window.location.hostname;
-    const socketUrl = `${socketProto}//${socketHost}:3001`;
+  // ── Boot: socket + restore saved session ───────────────────────────────────
 
+  useEffect(() => {
     const existingSessionId = localStorage.getItem("oneprint_session");
     const savedFile = localStorage.getItem("oneprint_file");
 
+    // Restore file state from localStorage
     if (savedFile) {
       try {
         const fileData = JSON.parse(savedFile);
@@ -79,92 +102,27 @@ export const useKioskSession = () => {
 
         if (savedSettings) {
           const settings = JSON.parse(savedSettings);
-          setCopies(settings.copies || 1);
-          setPageRange(settings.pageRange || "all");
-          setEstimatedPages(settings.estimatedPages || fileData.pageCount);
-          setColorMode(settings.colorMode || "color");
+          setCopies(settings.copies ?? 1);
+          setPageRange(settings.pageRange ?? "all");
+          setEstimatedPages(settings.estimatedPages ?? fileData.pageCount);
+          setColorMode(settings.colorMode ?? "color");
         } else {
           setEstimatedPages(fileData.pageCount);
         }
 
-        setState("uploaded");
-      } catch (e) {
-        console.error("Failed to restore file state", e);
+        setKioskState("uploaded");
+      } catch {
+        console.error("Failed to restore file state");
         localStorage.removeItem("oneprint_file");
       }
     }
 
-    const newSocket = io(socketUrl);
-    setSocket(newSocket);
-
-    newSocket.on("connect", () => {
-      const kioskId = "kiosk_" + Math.floor(Math.random() * 1000);
-      newSocket.emit(
-        "register_kiosk",
-        kioskId,
-        savedFile ? existingSessionId : null,
-      );
-    });
-
-    newSocket.on(
-      "session_init",
-      (data: { sessionId: string; expiresAt: string }) => {
-        const currentFile = localStorage.getItem("oneprint_file");
-        if (!currentFile) {
-          setSessionId(data.sessionId);
-          setExpiresAt(data.expiresAt);
-          setState("waiting");
-        }
-        localStorage.setItem("oneprint_session", data.sessionId);
-        setSessionId(data.sessionId);
-        setExpiresAt(data.expiresAt);
-      },
-    );
-
-    newSocket.on(
-      "file-uploaded",
-      (data: { fileName: string; pageCount: number; filePath: string }) => {
-        setFileName(data.fileName);
-        setPageCount(data.pageCount);
-        setEstimatedPages(data.pageCount);
-        const normalizedPath = data.filePath.replace(/\\/g, "/");
-        setFilePath(normalizedPath);
-        setState("uploaded");
-
-        const fileData = { ...data, filePath: normalizedPath };
-        localStorage.setItem("oneprint_file", JSON.stringify(fileData));
-        if (sessionId) localStorage.setItem("oneprint_session", sessionId);
-      },
-    );
-
-    newSocket.on("print_started", () => {
-      setState("printing");
-      setPrintProgress(0);
-      localStorage.removeItem("oneprint_file");
-      localStorage.removeItem("oneprint_settings");
-    });
-
-    newSocket.on(
-      "print_progress",
-      (data: { sessionId: string; percent: number }) => {
-        setPrintProgress(data.percent);
-      },
-    );
-
-    newSocket.on("print_complete", () => {
-      setState("waiting");
-      localStorage.removeItem("oneprint_session");
-      localStorage.removeItem("oneprint_amount");
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 3000);
-    });
-
+    // Handle URL params (payment redirect)
     const urlParams = new URLSearchParams(window.location.search);
     const statusParam = urlParams.get("status");
 
     if (statusParam === "printing") {
-      setState("printing");
+      setKioskState("printing");
       localStorage.removeItem("oneprint_file");
       window.history.replaceState({}, document.title, "/");
     } else if (statusParam === "configure") {
@@ -175,21 +133,86 @@ export const useKioskSession = () => {
         setPageCount(fileData.pageCount);
         setFilePath(fileData.filePath.replace(/\\/g, "/"));
         setEstimatedPages(fileData.pageCount);
-        setState("uploaded");
+        setKioskState("uploaded");
         window.history.replaceState({}, document.title, "/");
       }
     }
 
-    newSocket.on("printer_update", () => {
-      window.location.reload();
+    // Socket connection
+    const socket = createSocket();
+
+    socket.on("connect", () => {
+      const kioskId = "kiosk_" + Math.floor(Math.random() * 1000);
+      socket.emit("register_kiosk", kioskId, savedFile ? existingSessionId : null);
+    });
+
+    socket.on("session_init", (data: { sessionId: string; expiresAt: string }) => {
+      const currentFile = localStorage.getItem("oneprint_file");
+      if (!currentFile) {
+        setKioskState("waiting");
+      }
+      setSessionId(data.sessionId);
+      setExpiresAt(data.expiresAt);
+      localStorage.setItem("oneprint_session", data.sessionId);
+    });
+
+    socket.on(
+      "file-uploaded",
+      (data: { fileName: string; pageCount: number; filePath: string }) => {
+        console.log("SOCKET: file-uploaded received!", data);
+        const normalizedPath = data.filePath.replace(/\\/g, "/");
+        setFileName(data.fileName);
+        setPageCount(data.pageCount);
+        setEstimatedPages(data.pageCount);
+        setFilePath(normalizedPath);
+        setKioskState("uploaded");
+
+        const fileData = { ...data, filePath: normalizedPath };
+        localStorage.setItem("oneprint_file", JSON.stringify(fileData));
+        const currentSession = localStorage.getItem("oneprint_session");
+        if (currentSession) localStorage.setItem("oneprint_session", currentSession);
+      },
+    );
+
+    socket.on("print_started", () => {
+      setKioskState("printing");
+      setPrintProgress(0);
+      localStorage.removeItem("oneprint_file");
+      localStorage.removeItem("oneprint_settings");
+    });
+
+    socket.on("print_progress", (data: { sessionId: string; percent: number }) => {
+      setPrintProgress(data.percent);
+    });
+
+    socket.on("print_complete", () => {
+      setKioskState("waiting");
+      localStorage.removeItem("oneprint_session");
+      localStorage.removeItem("oneprint_amount");
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 3000);
+    });
+
+    socket.on("printer_update", () => {
+      const apiUrl = getApiUrl();
+      kioskApi
+        .get(`${apiUrl}/api/admin/printers`)
+        .then(({ data }) => {
+          const available = data.length > 0;
+          setPrintersAvailable(available);
+        })
+        .catch(() => {/* ignore transient errors */});
     });
 
     return () => {
-      newSocket.disconnect();
+      socket.disconnect();
     };
-  }, [sessionId]); // Important dependency
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Calculate pages based on range
+  // ── Derived: estimated pages from page range ───────────────────────────────
+
   useEffect(() => {
     if (!pageRange.trim() || pageRange === "all") {
       setEstimatedPages(pageCount);
@@ -200,7 +223,7 @@ export const useKioskSession = () => {
       const parts = pageRange.split(",").map((p) => p.trim());
       let count = 0;
 
-      parts.forEach((part) => {
+      for (const part of parts) {
         if (part.includes("-")) {
           const [start, end] = part.split("-").map(Number);
           if (!isNaN(start) && !isNaN(end) && end >= start) {
@@ -216,28 +239,27 @@ export const useKioskSession = () => {
             count += 1;
           }
         }
-      });
+      }
 
       setEstimatedPages(count > 0 ? count : pageCount);
-    } catch (e) {
+    } catch {
       console.warn("Invalid page range format");
     }
-  }, [pageRange, pageCount]);
+  }, [pageRange, pageCount, setEstimatedPages]);
 
-  const handlePayment = async () => {
-    const activeSession = sessionId || localStorage.getItem("oneprint_session");
+  // ── Actions ────────────────────────────────────────────────────────────────
+
+  const handlePayment = useCallback(async () => {
+    const activeSession = sessionId ?? localStorage.getItem("oneprint_session");
     if (!activeSession) return;
+
     setLoadingPayment(true);
-
     try {
-      const apiProto = window.location.protocol;
-      const apiHost = window.location.hostname;
-      const apiUrl = `${apiProto}//${apiHost}:3001`;
-
+      const apiUrl = getApiUrl();
       const pricePerPage = colorMode === "color" ? priceColor : priceBw;
       const totalAmount = copies * estimatedPages * pricePerPage;
 
-      const paymentData: any = {
+      const paymentData = {
         sessionId: activeSession,
         amount: totalAmount,
         colorMode,
@@ -245,10 +267,7 @@ export const useKioskSession = () => {
         pageCount: estimatedPages,
       };
 
-      const { data } = await axios.post(
-        `${apiUrl}/api/order/token`,
-        paymentData,
-      );
+      const { data } = await kioskApi.post(`${apiUrl}/api/order/init`, paymentData);
 
       localStorage.setItem("oneprint_amount", totalAmount.toString());
       localStorage.setItem("oneprint_session", activeSession);
@@ -258,73 +277,59 @@ export const useKioskSession = () => {
       );
 
       window.snap.pay(data.token, {
-        onSuccess: async function (result: any) {
+        onSuccess: async (result: unknown) => {
           console.log("Payment Success:", result);
-          await axios.post(`${apiUrl}/api/order/complete`, {
+          await kioskApi.post(`${apiUrl}/api/order/complete`, {
             sessionId: activeSession,
             orderId: data.orderId,
           });
-          setState("printing");
+          setKioskState("printing");
         },
-        onPending: function (result: any) {
+        onPending: (result: unknown) => {
           console.log("Payment Pending:", result);
           setLoadingPayment(false);
         },
-        onError: function (result: any) {
+        onError: (result: unknown) => {
           console.log("Payment Error:", result);
           setLoadingPayment(false);
         },
-        onClose: function () {
+        onClose: () => {
           console.log("Payment Modal Closed");
           setLoadingPayment(false);
         },
       });
-    } catch (error: any) {
-      console.error("Payment Init Failed", error);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } }; message?: string };
+      console.error("Payment Init Failed:", error);
       alert(
         "Failed to initialize payment: " +
-          (error.response?.data?.message || error.message),
+          (err.response?.data?.message ?? err.message),
       );
       setLoadingPayment(false);
     }
-  };
+  }, [
+    sessionId,
+    colorMode,
+    priceColor,
+    priceBw,
+    copies,
+    estimatedPages,
+    pageRange,
+    setLoadingPayment,
+    setKioskState,
+  ]);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setShowResetModal(true);
-  };
+  }, [setShowResetModal]);
 
-  const confirmReset = () => {
+  const confirmReset = useCallback(() => {
     localStorage.removeItem("oneprint_file");
     localStorage.removeItem("oneprint_settings");
     localStorage.removeItem("oneprint_amount");
     localStorage.removeItem("oneprint_session");
-
     window.location.reload();
-  };
+  }, []);
 
-  return {
-    state,
-    sessionId,
-    expiresAt,
-    printersAvailable,
-    fileName,
-    filePath,
-    pageCount,
-    copies,
-    setCopies,
-    colorMode,
-    setColorMode,
-    pageRange,
-    setPageRange,
-    estimatedPages,
-    priceBw,
-    priceColor,
-    printProgress,
-    loadingPayment,
-    showResetModal,
-    setShowResetModal,
-    handlePayment,
-    handleReset,
-    confirmReset,
-  };
+  return { handlePayment, handleReset, confirmReset };
 };

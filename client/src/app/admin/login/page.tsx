@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import axios from "axios";
+import { adminApi } from "@/lib/apiClient";
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -28,10 +28,9 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      await axios.post(
+      await adminApi.post(
         `${getApiUrl()}/api/auth/login`,
-        { username, password },
-        { withCredentials: true },
+        { username, password }
       );
       router.push("/admin");
     } catch (err: any) {

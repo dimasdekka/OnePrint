@@ -1,27 +1,28 @@
-import dynamic from "next/dynamic";
+"use client";
 
-const PDFPreview = dynamic(() => import("../PDFPreview"), {
-  ssr: false,
-  loading: () => <p>Loading PDF Viewer...</p>,
-});
+import { useKioskStore } from "@/store/kioskStore";
+import { useKioskSession } from "@/hooks/kiosk/useKioskSession";
 
-export default function ConfigScreen({ kioskData }: { kioskData: any }) {
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function ConfigScreen() {
   const {
     fileName,
     filePath,
     pageCount,
     copies,
-    setCopies,
     colorMode,
-    setColorMode,
     pageRange,
-    setPageRange,
     estimatedPages,
     priceBw,
     priceColor,
-    handlePayment,
     loadingPayment,
-  } = kioskData;
+    setCopies,
+    setColorMode,
+    setPageRange,
+  } = useKioskStore();
+
+  const { handlePayment } = useKioskSession();
 
   return (
     <div className="w-full flex flex-col items-center px-8 relative">
@@ -135,7 +136,9 @@ export default function ConfigScreen({ kioskData }: { kioskData: any }) {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setColorMode("bw")}
-                    className={`flex-1 flex items-center justify-center gap-2 border border-black rounded-md px-3 h-12 text-sm font-bold ${colorMode === "bw" ? "bg-gray-100" : "bg-white"}`}
+                    className={`flex-1 flex items-center justify-center gap-2 border border-black rounded-md px-3 h-12 text-sm font-bold ${
+                      colorMode === "bw" ? "bg-gray-100" : "bg-white"
+                    }`}
                   >
                     <div className="w-4 h-4 rounded-full border border-black flex items-center justify-center">
                       {colorMode === "bw" && (
@@ -146,7 +149,9 @@ export default function ConfigScreen({ kioskData }: { kioskData: any }) {
                   </button>
                   <button
                     onClick={() => setColorMode("color")}
-                    className={`flex-1 flex items-center justify-center gap-2 border border-black rounded-md px-3 h-12 text-sm font-bold ${colorMode === "color" ? "bg-gray-100" : "bg-white"}`}
+                    className={`flex-1 flex items-center justify-center gap-2 border border-black rounded-md px-3 h-12 text-sm font-bold ${
+                      colorMode === "color" ? "bg-gray-100" : "bg-white"
+                    }`}
                   >
                     <div className="w-4 h-4 rounded-full border border-black flex items-center justify-center">
                       {colorMode === "color" && (

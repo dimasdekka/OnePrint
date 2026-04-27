@@ -1,6 +1,7 @@
 "use client";
 
 import { useKioskSession } from "@/hooks/kiosk/useKioskSession";
+import { useKioskStore } from "@/store/kioskStore";
 import KioskLayout from "@/components/kiosk/KioskLayout";
 import WaitingScreen from "@/components/kiosk/WaitingScreen";
 import ConfigScreen from "@/components/kiosk/ConfigScreen";
@@ -8,26 +9,35 @@ import PrintingScreen from "@/components/kiosk/PrintingScreen";
 
 declare global {
   interface Window {
-    snap: any;
+    snap: {
+      pay: (
+        token: string,
+        options: {
+          onSuccess: (result: unknown) => void;
+          onPending: (result: unknown) => void;
+          onError: (result: unknown) => void;
+          onClose: () => void;
+        },
+      ) => void;
+    };
   }
 }
 
 export default function KioskPage() {
-  const kioskData = useKioskSession();
+  const { handlePayment: _handlePayment, handleReset, confirmReset } = useKioskSession();
+
+  const { kioskState, sessionId, expiresAt, printProgress } = useKioskStore();
 
   return (
-    <KioskLayout kioskData={kioskData}>
-      {kioskData.state === "waiting" && kioskData.sessionId && (
-        <WaitingScreen
-          sessionId={kioskData.sessionId!}
-          expiresAt={kioskData.expiresAt}
-        />
+    <KioskLayout handleReset={handleReset} confirmReset={confirmReset}>
+      {kioskState === "waiting" && sessionId && (
+        <WaitingScreen sessionId={sessionId} expiresAt={expiresAt} />
       )}
 
-      {kioskData.state === "uploaded" && <ConfigScreen kioskData={kioskData} />}
+      {kioskState === "uploaded" && <ConfigScreen />}
 
-      {kioskData.state === "printing" && (
-        <PrintingScreen printProgress={kioskData.printProgress} />
+      {kioskState === "printing" && (
+        <PrintingScreen printProgress={printProgress} />
       )}
     </KioskLayout>
   );

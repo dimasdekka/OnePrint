@@ -2,32 +2,37 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
-
-// Configure axios globally to include credentials (cookies) in requests
-axios.defaults.withCredentials = true;
-
-import { useAdminData } from "@/hooks/admin/useAdminData";
+import { useAdminActions } from "@/hooks/admin/useAdminData";
+import { useAdminStore } from "@/store/adminStore";
 import PrinterManager from "@/components/admin/PrinterManager";
 import ReportManager from "@/components/admin/ReportManager";
 import SettingsManager from "@/components/admin/SettingsManager";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type ModalConfig = {
+  isOpen: boolean;
+  type: "confirm" | "alert" | "info";
+  title: string;
+  message: string;
+  onConfirm?: () => void;
+  onCancel?: () => void;
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export default function AdminDashboard() {
   const router = useRouter();
-  const adminData = useAdminData();
-  const [activeTab, setActiveTab] = useState<"printers" | "reports">(
-    "printers",
-  );
 
-  // Modal State
-  const [modalConfig, setModalConfig] = useState<{
-    isOpen: boolean;
-    type: "confirm" | "alert" | "info";
-    title: string;
-    message: string;
-    onConfirm?: () => void;
-    onCancel?: () => void;
-  }>({
+  // Boot admin data fetch + socket setup — only called ONCE in page
+  const { fetchPrinters, fetchReports } = useAdminActions();
+
+  const { isAuthorized, authLoading } = useAdminStore();
+  const [activeTab, setActiveTab] = useState<"printers" | "reports">("printers");
+
+  // ── Modal state ────────────────────────────────────────────────────────────
+
+  const [modalConfig, setModalConfig] = useState<ModalConfig>({
     isOpen: false,
     type: "info",
     title: "",
@@ -60,7 +65,9 @@ export default function AdminDashboard() {
     });
   };
 
-  if (adminData.authLoading) {
+  // ── Guards ─────────────────────────────────────────────────────────────────
+
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-indigo-600"></div>
@@ -68,7 +75,9 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!adminData.isAuthorized) return null;
+  if (!isAuthorized) return null;
+
+  // ── Nav items ──────────────────────────────────────────────────────────────
 
   const navItems = [
     {
@@ -111,6 +120,8 @@ export default function AdminDashboard() {
     },
   ] as const;
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <div className="min-h-screen bg-gray-50 flex font-sans text-black">
       {/* Sidebar */}
@@ -125,7 +136,7 @@ export default function AdminDashboard() {
           {navItems.map(({ key, icon, label }) => (
             <button
               key={key}
-              onClick={() => setActiveTab(key as any)}
+              onClick={() => setActiveTab(key)}
               className={`w-full text-left px-6 py-3 font-bold rounded-full transition-colors flex items-center gap-4 ${
                 activeTab === key
                   ? "border border-black bg-white text-black shadow-sm"
@@ -169,12 +180,12 @@ export default function AdminDashboard() {
         <div className="max-w-[1200px]">
           {activeTab === "printers" && (
             <>
-              <PrinterManager adminData={adminData} showModal={showModal} />
-              <SettingsManager adminData={adminData} showModal={showModal} />
+              <PrinterManager showModal={showModal} fetchPrinters={fetchPrinters} />
+              <SettingsManager showModal={showModal} />
             </>
           )}
           {activeTab === "reports" && (
-            <ReportManager adminData={adminData} showModal={showModal} />
+            <ReportManager showModal={showModal} fetchReports={fetchReports} />
           )}
         </div>
       </main>
@@ -182,7 +193,7 @@ export default function AdminDashboard() {
       {/* Modal */}
       {modalConfig.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-sm border border-black shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-sm border border-black shadow-xl overflow-hidden">
             <div className="p-6">
               <div className="flex items-center justify-center w-12 h-12 rounded-full border border-black mb-4 mx-auto">
                 <span className="font-bold text-xl">!</span>

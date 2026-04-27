@@ -9,6 +9,23 @@ const { generateOrderId, calculateTotalWithTax } = require("../utils/helpers");
 const logger = require("../utils/logger");
 
 /**
+ * Retry helper for transient network errors (like ECONNRESET)
+ */
+const withRetry = async (fn, maxRetries = 3, delay = 1000) => {
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    try {
+      return await fn();
+    } catch (error) {
+      attempt++;
+      if (attempt >= maxRetries) throw error;
+      logger.warn(`Midtrans API request failed, retrying (${attempt}/${maxRetries})...`, { error: error.message });
+      await new Promise(resolve => setTimeout(resolve, delay * attempt));
+    }
+  }
+};
+
+/**
  * Payment Service
  * Handles payment-related business logic
  */
@@ -152,7 +169,12 @@ const createMidtransToken = async (sessionId, filename, printJobData = {}) => {
     ],
   };
 
-  const transaction = await snap.createTransaction(parameter);
+  // Wrap in retry to handle Midtrans ECONNRESET issues
+  const transaction = await withRetry(
+    () => snap.createTransaction(parameter),
+    3,    // max attempts
+    1000, // 1s -> 2s -> 3s backoff
+  );
 
   // Create transaction in DB with midtransToken and printer reference
   await createTransaction(

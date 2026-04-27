@@ -9,8 +9,8 @@ export interface ServerToClientEvents {
     pageCount: number;
     filePath: string;
   }) => void;
-  print_started: () => void;
-  print_complete: () => void;
+  print_started: (data: { sessionId: string }) => void;
+  print_complete: (data: { sessionId: string }) => void;
   printer_update: () => void;
   user_connected: (data: { message: string }) => void;
   error: (data: { message: string }) => void;

@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { io } from "socket.io-client";
+import { useEffect, useState, useRef } from "react";
+import { createSocket } from "@/lib/socket";
 import { QRCodeSVG } from "qrcode.react";
 
 export default function KioskPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const fileNameRef = useRef<string | null>(null);
   const [status, setStatus] = useState("Initializing System...");
   const [socket, setSocket] = useState<any>(null);
 
   useEffect(() => {
-    const newSocket = io("http://localhost:3001");
+    const newSocket = createSocket();
     setSocket(newSocket);
 
     newSocket.on("connect", () => {
@@ -19,16 +20,21 @@ export default function KioskPage() {
       newSocket.emit("register_kiosk", kioskId);
     });
 
-    newSocket.on("session_init", (data: { sessionId: string }) => {
+    newSocket.on("session_init", (data) => {
       setSessionId(data.sessionId);
     });
-
+    
+    newSocket.on("file-uploaded", (data) => {
+      fileNameRef.current = data.fileName;
+      setStatus(`File Uploaded: ${data.fileName}. Waiting for Payment...`);
+    });
+ 
     newSocket.on("user_connected", () => {
       setStatus("User Connected. Waiting for File...");
     });
-
-    newSocket.on("print_start", (data: { filename: string }) => {
-      setStatus(`Processing: ${data.filename}`);
+ 
+    newSocket.on("print_started", () => {
+      setStatus(`Processing: ${fileNameRef.current || "Document"}`);
     });
 
     newSocket.on("print_complete", () => {

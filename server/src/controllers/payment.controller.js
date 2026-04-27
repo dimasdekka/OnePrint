@@ -19,7 +19,7 @@ const logger = require("../utils/logger");
  * POST /api/payment/token
  */
 const generateToken = asyncHandler(async (req, res) => {
-  const { sessionId, printerId, colorMode } = req.body;
+  const { sessionId, printerId, colorMode, amount, copies, pageCount } = req.body;
 
   // Get session to retrieve filename and print details
   const session = await sessionService.getSessionById(sessionId);
@@ -33,9 +33,10 @@ const generateToken = asyncHandler(async (req, res) => {
   // Prepare print job data with printer settings
   const printJobData = {
     printerId: printerId || null,
-    pageCount: session.file?.totalPages || session.pageCount || 1,
-    copies: session.copies || 1,
+    pageCount: pageCount || session.file?.totalPages || session.pageCount || 1,
+    copies: copies || session.copies || 1,
     colorMode: colorMode || session.colorMode || "color",
+    amount: amount || null,
   };
 
   const result = await paymentService.createMidtransToken(
@@ -44,10 +45,13 @@ const generateToken = asyncHandler(async (req, res) => {
     printJobData,
   );
 
-  // Update session with the selected color mode and printer if provided
-  if (colorMode || printerId) {
-    const updateData = {};
-    if (colorMode) updateData.colorMode = colorMode;
+  // Update session with the selected settings
+  const updateData = {};
+  if (colorMode) updateData.colorMode = colorMode;
+  if (copies) updateData.copies = copies;
+  if (pageCount) updateData.pageCount = pageCount;
+  
+  if (Object.keys(updateData).length > 0) {
     await sessionService.updateSessionSettings(sessionId, updateData);
   }
 

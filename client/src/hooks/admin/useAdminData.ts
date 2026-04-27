@@ -1,46 +1,47 @@
-import { useState, useCallback, useEffect } from "react";
-import axios from "axios";
+"use client";
+
+import { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { io } from "socket.io-client";
-import type { Printer, Report, Summary } from "@/types/admin";
+import { adminApi } from "@/lib/apiClient";
+import { getApiUrl } from "@/lib/getApiUrl";
+import { createSocket } from "@/lib/socket";
+import { useAdminStore } from "@/store/adminStore";
+import type { Printer, Report } from "@/types/admin";
 
-export const useAdminData = () => {
+/**
+ * useAdminActions
+ *
+ * Handles all side-effects and async operations for the Admin dashboard.
+ * Call ONCE in the page-level component. State lives in `useAdminStore`.
+ */
+export const useAdminActions = () => {
   const router = useRouter();
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
 
-  // Printers
-  const [printers, setPrinters] = useState<Printer[]>([]);
-  const [osPrinters, setOsPrinters] = useState<any[]>([]);
-  const [selectedOsPrinter, setSelectedOsPrinter] = useState("");
-  const [loadingPrinters, setLoadingPrinters] = useState(false);
+  const {
+    filterFrom,
+    filterTo,
+    setIsAuthorized,
+    setAuthLoading,
+    setPrinters,
+    setReports,
+    setSummary,
+    setLoadingReports,
+    setPriceBw,
+    setPriceColor,
+  } = useAdminStore();
 
-  // Reports
-  const [reports, setReports] = useState<Report[]>([]);
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [loadingReports, setLoadingReports] = useState(false);
-  const [filterFrom, setFilterFrom] = useState("");
-  const [filterTo, setFilterTo] = useState("");
-
-  // Settings
-  const [priceBw, setPriceBw] = useState(1500);
-  const [priceColor, setPriceColor] = useState(3000);
-  const [loadingSettings, setLoadingSettings] = useState(false);
-
-  const getApiUrl = useCallback(() => {
-    const proto = window.location.protocol;
-    const host = window.location.hostname;
-    return `${proto}//${host}:3001`;
-  }, []);
+  // ── Fetch helpers ──────────────────────────────────────────────────────────
 
   const fetchPrinters = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${getApiUrl()}/api/admin/printers`);
+      const { data } = await adminApi.get<Printer[]>(
+        `${getApiUrl()}/api/admin/printers`,
+      );
       setPrinters(data);
     } catch (e) {
-      console.error("Failed to fetch printers", e);
+      console.error("Failed to fetch printers:", e);
     }
-  }, [getApiUrl]);
+  }, [setPrinters]);
 
   const fetchReports = useCallback(async () => {
     setLoadingReports(true);
@@ -50,71 +51,86 @@ export const useAdminData = () => {
       if (filterTo) params.append("to", filterTo);
 
       const [repRes, sumRes] = await Promise.all([
-        axios.get(`${getApiUrl()}/api/admin/reports?${params}`),
-        axios.get(`${getApiUrl()}/api/admin/reports/summary`),
+        adminApi.get(`${getApiUrl()}/api/admin/reports?${params}`),
+        adminApi.get(`${getApiUrl()}/api/admin/reports/summary`),
       ]);
 
       setReports(repRes.data);
       setSummary(sumRes.data);
     } catch (e) {
-      console.error("Failed to fetch reports", e);
+      console.error("Failed to fetch reports:", e);
     } finally {
       setLoadingReports(false);
     }
-  }, [getApiUrl, filterFrom, filterTo]);
+  }, [filterFrom, filterTo, setLoadingReports, setReports, setSummary]);
 
   const fetchSettings = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${getApiUrl()}/api/admin/settings`);
+      const { data } = await adminApi.get(`${getApiUrl()}/api/admin/settings`);
       if (data) {
-        setPriceBw(data.pricePerPageBw || 1500);
-        setPriceColor(data.pricePerPageColor || 3000);
+        setPriceBw(data.pricePerPageBw ?? 1500);
+        setPriceColor(data.pricePerPageColor ?? 3000);
       }
     } catch (e) {
-      console.error("Failed to fetch settings", e);
+      console.error("Failed to fetch settings:", e);
     }
-  }, [getApiUrl]);
+  }, [setPriceBw, setPriceColor]);
+
+  // ── Socket setup ───────────────────────────────────────────────────────────
 
   const setupSocket = useCallback(() => {
-    const socket = io(`${getApiUrl()}`);
+    const socket = createSocket();
 
-    socket.on("admin_job_update", (job: any) => {
-      setPrinters((prev) =>
-        prev.map((p) =>
-          p.name === job.printerName ? { ...p, jobs: p.jobs + 1 } : p,
-        ),
-      );
-      const newReport: Report = {
-        id: job.id,
-        date:
-          new Date().toLocaleDateString("id-ID") +
-          " " +
-          new Date().toLocaleTimeString("id-ID"),
-        filename: job.fileName,
-        pages: job.pages,
-        copies: 1,
-        amount: job.pages * 1500, // naive fallback if no job amount
-        status: "Success",
-      };
-      setReports((prev) => [newReport, ...prev]);
-    });
+    socket.on(
+      "admin_job_update",
+      (job: {
+        printerName: string;
+        id: string;
+        fileName: string;
+        pages: number;
+      }) => {
+        setPrinters((prev: Printer[]) =>
+          prev.map((p) =>
+            p.name === job.printerName ? { ...p, jobs: p.jobs + 1 } : p,
+          ),
+        );
+
+        const newReport: Report = {
+          id: job.id,
+          date:
+            new Date().toLocaleDateString("id-ID") +
+            " " +
+            new Date().toLocaleTimeString("id-ID"),
+          filename: job.fileName,
+          pages: job.pages,
+          copies: 1,
+          amount: job.pages * 1500,
+          status: "Success",
+        };
+
+        setReports((prev: Report[]) => [newReport, ...prev]);
+      },
+    );
+
 
     socket.on("printer_update", () => {
       fetchPrinters();
     });
 
     return () => socket.disconnect();
-  }, [fetchPrinters, getApiUrl]);
+  }, [fetchPrinters, setPrinters, setReports]);
+
+  // ── Bootstrap on mount ─────────────────────────────────────────────────────
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        await axios.get(`${getApiUrl()}/api/auth/me`);
+        await adminApi.get(`${getApiUrl()}/api/auth/me`);
         setIsAuthorized(true);
         fetchPrinters();
         fetchReports();
         fetchSettings();
-      } catch (err) {
+      } catch {
         router.push("/admin/login");
       } finally {
         setAuthLoading(false);
@@ -123,50 +139,15 @@ export const useAdminData = () => {
 
     checkAuth();
 
-    const cleanup = setupSocket();
-    const syncInterval = setInterval(fetchPrinters, 30000);
+    const cleanupSocket = setupSocket();
+    const syncInterval = setInterval(fetchPrinters, 30_000);
 
     return () => {
       clearInterval(syncInterval);
-      cleanup();
+      cleanupSocket();
     };
-  }, [
-    fetchPrinters,
-    fetchReports,
-    fetchSettings,
-    getApiUrl,
-    router,
-    setupSocket,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  return {
-    isAuthorized,
-    authLoading,
-    printers,
-    setPrinters,
-    osPrinters,
-    setOsPrinters,
-    selectedOsPrinter,
-    setSelectedOsPrinter,
-    loadingPrinters,
-    setLoadingPrinters,
-    reports,
-    setReports,
-    summary,
-    loadingReports,
-    filterFrom,
-    setFilterFrom,
-    filterTo,
-    setFilterTo,
-    priceBw,
-    setPriceBw,
-    priceColor,
-    setPriceColor,
-    loadingSettings,
-    setLoadingSettings,
-    fetchPrinters,
-    fetchReports,
-    fetchSettings,
-    getApiUrl,
-  };
+  return { fetchPrinters, fetchReports, fetchSettings };
 };

@@ -252,32 +252,20 @@ const syncPrinterStatus = async (printerId) => {
     const escapedPrinterName = printer.name.replace(/'/g, "''");
 
     // Use Win32_Printer WMI query — much more accurate than Get-Printer.
-    // It exposes WorkOffline, PrinterState, and DetectedErrorState.
-    //
-    // PrinterState flags (bitmask):
-    //   0         = Idle / Ready
-    //   1         = Paused
-    //   2         = Error
-    //   4         = Deleting
-    //   8         = Paper Jam
-    //   16        = Paper Out
-    //   128       = Door Open
-    //   4096      = Offline  ← key flag
-    // WorkOffline: $true when printer is set to work offline or unreachable
-    // DetectedErrorState: 0=Unknown, 1=Other, 2=No Error, 3=Low Paper, etc.
-    const command = `powershell -NoProfile -Command "$p = Get-WmiObject -Class Win32_Printer -Filter \"Name='${escapedPrinterName}'\" -ErrorAction SilentlyContinue; if ($p) { [PSCustomObject]@{ WorkOffline=$p.WorkOffline; PrinterState=$p.PrinterState; DetectedErrorState=$p.DetectedErrorState } | ConvertTo-Json } else { '{}' }"`;
+    const command = `$p = Get-WmiObject -Class Win32_Printer -Filter "Name='${escapedPrinterName}'" -ErrorAction SilentlyContinue; if ($p) { [PSCustomObject]@{ WorkOffline=$p.WorkOffline; PrinterState=$p.PrinterState; DetectedErrorState=$p.DetectedErrorState } | ConvertTo-Json -Compress } else { '{}' }`;
 
     return new Promise((resolve) => {
       exec(
         command,
-        { maxBuffer: 1024 * 1024, timeout: 10000 },
+        { shell: "powershell.exe", maxBuffer: 1024 * 1024, timeout: 5000 },
         async (error, stdout, stderr) => {
-          if (
-            error ||
-            !stdout ||
-            stdout.trim() === "" ||
-            stdout.trim() === "{}"
-          ) {
+          try {
+            if (
+              error ||
+              !stdout ||
+              stdout.trim() === "" ||
+              stdout.trim() === "{}"
+            ) {
             logger.warn(
               "Could not get printer status from WMI, marking offline",
               {
@@ -325,10 +313,6 @@ const syncPrinterStatus = async (printerId) => {
             logger.info("Printer status synced via WMI", {
               printerId,
               printerName: printer.name,
-              workOffline,
-              stateOffline,
-              hasError,
-              detectedErrorState: result.DetectedErrorState,
               newStatus: status,
             });
 
@@ -336,8 +320,6 @@ const syncPrinterStatus = async (printerId) => {
           } catch (parseError) {
             logger.warn("Failed to parse WMI printer status, marking offline", {
               printerId,
-              printerName: printer.name,
-              output: stdout,
               parseError: parseError.message,
             });
 
@@ -348,6 +330,10 @@ const syncPrinterStatus = async (printerId) => {
             );
             resolve(updated);
           }
+          } catch (fatalError) {
+            logger.error("Fatal error inside sync callback", { error: fatalError.message });
+            resolve(null);
+        }
         },
       );
     });
@@ -363,7 +349,15 @@ const syncPrinterStatus = async (printerId) => {
  * @param {Server|null} io - Socket.IO server instance (for real-time updates)
  */
 const startPrinterMonitor = (intervalMs = 30000, io = null) => {
+  let isRunning = false;
+
   const monitor = setInterval(async () => {
+    if (isRunning) {
+      logger.warn("Printer monitor skipped (previous cycle still running)");
+      return;
+    }
+    
+    isRunning = true;
     try {
       const printers = await prisma.printer.findMany();
       let anyChanged = false;
@@ -393,6 +387,8 @@ const startPrinterMonitor = (intervalMs = 30000, io = null) => {
       });
     } catch (error) {
       logger.error("Printer monitor error", { error: error.message });
+    } finally {
+      isRunning = false;
     }
   }, intervalMs);
 

@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { io } from "socket.io-client";
-import axios from "axios";
+import { kioskApi } from "@/lib/apiClient";
+import { createSocket } from "@/lib/socket";
+import { API_BASE_URL } from "@/lib/constants";
 
-// NOTE: Ideally we use env vars for URLs
-const API_URL = "http://localhost:3001";
+
 
 export default function ScanPage({
   params,
@@ -25,24 +25,17 @@ export default function ScanPage({
   }, [params]);
 
   useEffect(() => {
-    // Dynamically determine API URL
-    const apiProto = window.location.protocol;
-    const apiHost = window.location.hostname;
-    const apiUrl = `${apiProto}//${apiHost}:3001`;
-
     if (!sessionIdUnwrapped) return;
 
+    const apiUrl = API_BASE_URL;
+
     // 1. Verify session with server API
-    axios
+    kioskApi
       .get(`${apiUrl}/api/verify-session/${sessionIdUnwrapped}`)
       .then((response) => {
         if (response.data.valid) {
           // 2. Connect socket to join room (optional for this step, but good for status updates)
-          const apiProto = window.location.protocol;
-          const apiHost = window.location.hostname;
-          const apiUrl = `${apiProto}//${apiHost}:3001`;
-
-          const socket = io(apiUrl);
+          const socket = createSocket();
           socket.emit("join_session", { sessionId: sessionIdUnwrapped });
 
           // 3. Redirect to upload page

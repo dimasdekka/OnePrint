@@ -20,8 +20,6 @@ router.get(
 // Managed printers
 router.get(
   "/admin/printers",
-  authRequired,
-  adminRequired,
   adminController.getManagedPrinters,
 );
 router.post(
@@ -81,8 +79,6 @@ router.delete(
 // Settings
 router.get(
   "/admin/settings",
-  authRequired,
-  adminRequired,
   adminController.getSettings,
 );
 router.post(

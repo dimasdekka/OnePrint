@@ -8,7 +8,7 @@ const { validatePaymentToken } = require("../middleware/validator");
  */
 
 // Generate Midtrans payment token
-router.post("/token", validatePaymentToken, paymentController.generateToken);
+router.post("/init", validatePaymentToken, paymentController.generateToken);
 
 // Midtrans notification webhook
 router.post("/notification", paymentController.handleNotification);

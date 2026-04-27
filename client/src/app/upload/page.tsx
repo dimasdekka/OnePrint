@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import axios from "axios";
+import { kioskApi } from "@/lib/apiClient";
 
 export default function UploadPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -31,7 +31,7 @@ export default function UploadPage() {
         const apiHost = window.location.hostname;
         const apiUrl = `${apiProto}//${apiHost}:3001`;
 
-        const response = await axios.get(`${apiUrl}/api/verify-session/${sid}`);
+        const response = await kioskApi.get(`${apiUrl}/api/verify-session/${sid}`);
 
         if (response.data.valid) {
           setSessionId(sid);
@@ -85,7 +85,7 @@ export default function UploadPage() {
       formData.append("file", selectedFile);
       formData.append("sessionId", sessionId);
 
-      const response = await axios.post(`${apiUrl}/api/upload`, formData, {
+      const response = await kioskApi.post(`${apiUrl}/api/upload`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
