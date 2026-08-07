@@ -24,7 +24,6 @@ interface PrinterManagerProps {
 export default function PrinterManager({ showModal, fetchPrinters }: PrinterManagerProps) {
   const {
     printers,
-
     osPrinters,
     selectedOsPrinter,
     loadingPrinters,

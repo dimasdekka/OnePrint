@@ -4,8 +4,8 @@ export default function PrintingScreen({
   printProgress: number;
 }) {
   return (
-    <div className="w-full flex items-center justify-center p-12">
-      <div className="max-w-md w-full bg-white border border-black shadow-sm rounded-xl p-10 text-center">
+    <div className="w-full h-full flex items-center justify-center p-8">
+      <div className="max-w-md w-full bg-white border border-black shadow-sm rounded-xl p-8 text-center">
         <h2 className="text-2xl font-bold text-black mb-4">
           {printProgress >= 100 ? "Selesai!" : "Mencetak..."}
         </h2>

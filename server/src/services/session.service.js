@@ -64,6 +64,16 @@ const validateSession = async (sessionId) => {
     };
   }
 
+  if (
+    session.status === SESSION_STATUS.EXPIRED ||
+    session.status === SESSION_STATUS.FAILED
+  ) {
+    return {
+      valid: false,
+      reason: "Session has been reset. Please scan new QR.",
+    };
+  }
+
   if (session.used) {
     return {
       valid: false,
@@ -151,7 +161,7 @@ const markSessionUsed = async (
 /**
  * Update print settings in session
  * @param {string} sessionId - Session ID
- * @param {Object} settings - Settings to update (colorMode, copies, pageRange)
+ * @param {Object} settings - Settings to update (colorMode, copies, pageRange, pageCount)
  * @returns {Promise<Object>} Updated session
  */
 const updateSessionSettings = async (sessionId, settings) => {
@@ -161,6 +171,8 @@ const updateSessionSettings = async (sessionId, settings) => {
   if (settings.copies !== undefined) updateData.copies = settings.copies;
   if (settings.pageRange !== undefined)
     updateData.pageRange = settings.pageRange;
+  if (settings.pageCount !== undefined)
+    updateData.pageCount = settings.pageCount;
 
   const session = await prisma.session.update({
     where: { id: sessionId },
@@ -211,6 +223,35 @@ const updateSessionSocket = async (sessionId, socketId) => {
   });
 };
 
+/**
+ * Reset a cancellable kiosk session so stale QR/upload/payment flows stop.
+ * Printing and completed sessions are left untouched for audit safety.
+ * @param {string} sessionId - Session ID
+ * @returns {Promise<boolean>} Whether a session was reset
+ */
+const resetSession = async (sessionId) => {
+  const result = await prisma.session.updateMany({
+    where: {
+      id: sessionId,
+      status: {
+        notIn: [SESSION_STATUS.PRINTING, SESSION_STATUS.COMPLETED],
+      },
+    },
+    data: {
+      status: SESSION_STATUS.EXPIRED,
+      used: true,
+      expiresAt: new Date(),
+    },
+  });
+
+  logger.info("Session reset requested", {
+    sessionId,
+    reset: result.count > 0,
+  });
+
+  return result.count > 0;
+};
+
 module.exports = {
   createSession,
   validateSession,
@@ -220,4 +261,5 @@ module.exports = {
   getSessionsByUser,
   getSessionById,
   updateSessionSocket,
+  resetSession,
 };

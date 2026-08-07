@@ -6,6 +6,14 @@ import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/apiClient";
 import { getApiUrl } from "@/lib/getApiUrl";
 
+type ApiError = {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+};
+
 export default function AdminLogin() {
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -26,9 +34,10 @@ export default function AdminLogin() {
         { username, password }
       );
       router.push("/admin");
-    } catch (err: any) {
-      if (err.response?.data?.message) {
-        setError(err.response.data.message);
+    } catch (err: unknown) {
+      const apiError = err as ApiError;
+      if (apiError.response?.data?.message) {
+        setError(apiError.response.data.message);
       } else {
         setError("Login failed. Check server connection.");
       }

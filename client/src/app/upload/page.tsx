@@ -15,7 +15,7 @@ export default function UploadPage() {
       if (typeof window === "undefined") return;
 
       const urlParams = new URLSearchParams(window.location.search);
-      let sid = urlParams.get("session");
+      const sid = urlParams.get("session");
 
       if (!sid) {
         setSessionError(

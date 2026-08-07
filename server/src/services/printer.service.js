@@ -172,9 +172,17 @@ const toggleDummyPrinter = async (action) => {
  * @param {string} printerId - Printer ID
  * @param {string} filePath - Path to file to print
  * @param {number} copies - Number of copies
+ * @param {string} colorMode - "bw" or "color"
+ * @param {string} pageRange - Page range to print
  * @returns {Promise<boolean>} Success status
  */
-const sendToPrinter = async (printerId, filePath, copies = 1) => {
+const sendToPrinter = async (
+  printerId,
+  filePath,
+  copies = 1,
+  colorMode = "color",
+  pageRange = "all",
+) => {
   try {
     // Get printer details
     const printer = await prisma.printer.findUnique({
@@ -198,6 +206,8 @@ const sendToPrinter = async (printerId, filePath, copies = 1) => {
       printerName: printer.name,
       filePath,
       copies,
+      colorMode,
+      pageRange,
     });
 
     if (printer.name === DUMMY_PRINTER.NAME) {
@@ -207,16 +217,25 @@ const sendToPrinter = async (printerId, filePath, copies = 1) => {
       return true;
     }
 
-    // Use pdf-to-printer for reliable printing to a named printer
-    await print(filePath, {
+    const printOptions = {
       printer: printer.name,
-      copies: copies,
-    });
+      copies: Math.max(1, Number(copies) || 1),
+      monochrome: colorMode === "bw",
+    };
+
+    if (pageRange && pageRange !== "all") {
+      printOptions.pages = pageRange;
+    }
+
+    // Use pdf-to-printer for reliable printing to a named printer.
+    await print(filePath, printOptions);
 
     logger.info("Document sent to printer", {
       printerId,
       filePath,
       copies,
+      colorMode,
+      pageRange,
       printerName: printer.name,
     });
 

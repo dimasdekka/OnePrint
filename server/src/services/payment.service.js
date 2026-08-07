@@ -147,11 +147,6 @@ const createMidtransToken = async (sessionId, filename, printJobData = {}) => {
       first_name: "OnePrint",
       last_name: "User",
     },
-    callbacks: {
-      finish: process.env.CLIENT_URL || "http://localhost:3000",
-      error: process.env.CLIENT_URL || "http://localhost:3000",
-      close: process.env.CLIENT_URL || "http://localhost:3000",
-    },
     enabled_payments: ["other_qris"],
     item_details: [
       {
@@ -222,7 +217,7 @@ const processPayment = async (sessionId) => {
   return {
     sessionId,
     fileName: session.file.filename,
-    pageCount: session.file?.totalPages || session.pageCount || 1,
+    pageCount: session.pageCount || session.file?.totalPages || 1,
   };
 };
 

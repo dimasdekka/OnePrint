@@ -1,91 +1,63 @@
 # OnePrint - Self-Service Printing Kiosk
 
-OnePrint is a web-based self-service printing solution that allows users to scan a QR code from a kiosk, upload documents via their smartphone, and pay using Midtrans (QRIS/E-Wallet) to automatically trigger a print job.
+OnePrint is a web-based self-service printing solution. Users scan a QR code from a kiosk, upload documents from a phone, pay with Midtrans, and the kiosk triggers the print job.
 
-## 🚀 Features
+## Features
 
-- **Kiosk Mode**: Dedicated display with split layout (Instructions + Dynamic QR Code).
-- **Mobile Handover**: Scan QR to transfer session to smartphone.
-- **File Upload**: Support for PDF and Images.
-- **Payment Integration**: Midtrans Snap (Sandbox) for secure payments.
-- **Real-time Status**: Socket.io for live updates between Kiosk and Phone.
-- **Persistent Data**: MySQL Database (via Docker) + Prisma ORM.
+- Kiosk mode with dynamic QR sessions.
+- Mobile handover for upload and payment.
+- PDF/image upload support.
+- Midtrans Snap payment integration.
+- Socket.io real-time status updates.
+- MySQL database through Prisma ORM.
 
-## 🛠️ Prerequisites
+## Prerequisites
 
-- **Node.js** (v18 or higher)
-- **Docker Desktop** (for MySQL Database)
-- **Midtrans Account** (Sandbox Keys)
+- Node.js v18 or newer.
+- MySQL database (e.g. Laragon / XAMPP / Docker MySQL).
+- Midtrans sandbox or production keys.
 
-## 📂 Project Structure
+## Project Structure
 
-- `client/`: Frontend application (Next.js 16, Tailwind CSS).
-- `server/`: Backend API (Express.js, Socket.io, Prisma, MySQL).
+- `client/`: Next.js frontend.
+- `server/`: Express, Socket.io, Prisma backend.
 
----
+## Quick Start (Super Simple)
 
-## ⚡ Quick Start Guide
-
-### 1. Database Setup (Docker)
-
-Make sure Docker Desktop is running.
+### 1. Setup di Laptop Baru (One-Command / One-Click)
+Cukup buka terminal di folder utama proyek lalu jalankan:
 
 ```bash
-# In the root project folder
-docker-compose up -d
+npm run setup
 ```
+*(Atau double-click file **`setup.bat`** di Windows)*
 
-This starts a MySQL container on port 3306.
+Ini akan otomatis menginstall semua paket dependencies untuk Root, Backend, dan Frontend, serta men-generate Prisma Client.
 
-### 2. Backend Setup
-
-configure the environment variables:
-Create `server/.env`:
-
-```env
-PORT=3001
-MIDTRANS_SERVER_KEY=SB-Mid-server-GwUP_WGbJPXsDzsNEBRs8Izh
-MIDTRANS_CLIENT_KEY=SB-Mid-client-61XuGAwQ8Vg5Dx9u
-DATABASE_URL="mysql://oneprint:oneprintpassword@localhost:3306/oneprint"
+### 2. Database MySQL (Laragon)
+Pastikan Laragon/MySQL aktif, lalu buat database `oneprint`:
+```sql
+CREATE DATABASE IF NOT EXISTS oneprint;
 ```
-
-Install dependencies and start server:
-
+Sync tabel database dengan menjalankan:
 ```bash
-cd server
-npm install
-npx prisma generate
-npx prisma db push
-npm start
+npm run db:push
 ```
 
-_Server runs on: `http://localhost:3001`_
-
-### 3. Frontend Setup
-
-Configure environment variables:
-Create `client/.env.local`:
-
-```env
-NEXT_PUBLIC_MIDTRANS_CLIENT_KEY=SB-Mid-client-61XuGAwQ8Vg5Dx9u
-```
-
-Install dependencies and start client:
-
+### 3. Jalankan Backend & Frontend Bersamaan
+Dari root folder, jalankan:
 ```bash
-cd client
-npm install
 npm run dev
 ```
+*(Atau double-click file **`start.bat`** di Windows)*
 
-_Client runs on: `http://localhost:3000`_
+- **Backend (API & Socket.io)**: `http://localhost:3001`
+- **Frontend (Kiosk & Mobile App)**: `http://localhost:3000`
 
----
+## Usage Flow
 
-## 📖 Usage Flow
-
-1.  **Open Kiosk**: access `http://localhost:3000/kiosk` on the monitor/tablet.
-2.  **Scan QR**: Use your phone to scan the QR code displayed.
-3.  **Upload**: On your phone, select a file to print.
-4.  **Pay**: Click "Pay Now" and complete the transaction (Use **Gopay** or **Test Card** in Sandbox).
-5.  **Print**: Watch the Kiosk screen update to "Processing" -> "Printing" -> "Finished".
+1. Open `http://localhost:3000/kiosk` on the kiosk screen.
+2. Scan the QR code from a phone.
+3. Upload a file.
+4. Pay through Midtrans.
+5. The kiosk updates from processing to printing to finished.

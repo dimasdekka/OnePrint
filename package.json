@@ -1,17 +1,14 @@
 {
   "name": "oneprint",
   "version": "1.0.0",
-  "main": "index.js",
+  "private": true,
   "scripts": {
-    "start": "concurrently \"npm run start:server\" \"npm run start:client\"",
-    "start:server": "cd server && npm start",
-    "start:client": "cd client && npm run dev",
-    "install:all": "npm install && cd server && npm install && cd ../client && npm install"
+    "dev": "concurrently -k -n \"SERVER,CLIENT\" -c \"cyan,magenta\" \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "start": "npm run dev",
+    "setup": "npm install && npm --prefix server install && npm --prefix client install && npm --prefix server run db:generate",
+    "db:push": "npm --prefix server run db:push",
+    "db:studio": "npm --prefix server run db:studio"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "devDependencies": {
     "concurrently": "^9.2.1"
   }

@@ -5,12 +5,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Environment variables (tracked directly)
+# .env
+# .env.local
 
 # Next.js
 .next/
@@ -36,7 +33,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Local env files
-.env*.local
+# .env*.local
 
 # Vercel
 .vercel

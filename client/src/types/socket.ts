@@ -5,6 +5,7 @@
 export interface ServerToClientEvents {
   session_init: (data: { sessionId: string; expiresAt: string }) => void;
   "file-uploaded": (data: {
+    sessionId: string;
     fileName: string;
     pageCount: number;
     filePath: string;

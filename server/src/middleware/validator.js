@@ -46,7 +46,7 @@ const validateFileUpload = (req, res, next) => {
  * Validate payment token request
  */
 const validatePaymentToken = (req, res, next) => {
-  const { sessionId, amount } = req.body;
+  const { sessionId, amount, colorMode, copies, pageCount, pageRange } = req.body;
 
   if (!sessionId) {
     return res.status(400).json({
@@ -59,6 +59,44 @@ const validatePaymentToken = (req, res, next) => {
     return res.status(400).json({
       success: false,
       message: "Invalid amount",
+    });
+  }
+
+  if (colorMode && !["bw", "color"].includes(colorMode)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid color mode",
+    });
+  }
+
+  if (
+    copies !== undefined &&
+    (!Number.isInteger(Number(copies)) || Number(copies) < 1)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid copies",
+    });
+  }
+
+  if (
+    pageCount !== undefined &&
+    (!Number.isInteger(Number(pageCount)) || Number(pageCount) < 1)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid page count",
+    });
+  }
+
+  if (
+    pageRange &&
+    pageRange.trim().toLowerCase() !== "all" &&
+    !/^\s*\d+\s*(-\s*\d+\s*)?(,\s*\d+\s*(-\s*\d+\s*)?)*\s*$/.test(pageRange)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid page range",
     });
   }
 

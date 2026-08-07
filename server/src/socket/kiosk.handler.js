@@ -1,5 +1,5 @@
 const sessionService = require("../services/session.service");
-const { SOCKET_EVENTS, SESSION_STATUS } = require("../utils/constants");
+const { SOCKET_EVENTS } = require("../utils/constants");
 const logger = require("../utils/logger");
 
 /**
@@ -60,8 +60,13 @@ const handleRegisterKiosk = (socket, io) => {
           expiresAt: session.expiresAt.toISOString(),
         });
 
+        if (socket.data.sessionId && socket.data.sessionId !== session.id) {
+          socket.leave(socket.data.sessionId);
+        }
+
         // Join room for this session
         socket.join(session.id);
+        socket.data.sessionId = session.id;
 
         logger.info("Session initialized for kiosk", {
           sessionId: session.id,

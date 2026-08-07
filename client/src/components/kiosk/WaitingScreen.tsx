@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { useKioskStore } from "@/store/kioskStore";
 
 export const CountdownTimer = ({
   targetDate,
@@ -36,21 +35,18 @@ export const CountdownTimer = ({
   return <span className="text-gray-600 font-bold">{timeLeft}</span>;
 };
 
-export default function WaitingScreen({
-  sessionId,
-  expiresAt,
-  onQrExpire,
-}: {
+interface WaitingScreenProps {
   sessionId: string;
   expiresAt: string | null;
   onQrExpire: () => void;
-}) {
-  const { resetSession } = useKioskStore();
+}
 
+export const WaitingScreen: React.FC<WaitingScreenProps> = ({
+  sessionId,
+  expiresAt,
+  onQrExpire,
+}) => {
   const handleQrExpire = () => {
-    // Soft reset state — do NOT reload the page so any open Snap popup is unaffected
-    resetSession();
-    // Delegate re-registration to the hook (uses socketRef with all listeners)
     onQrExpire();
   };
 
@@ -59,20 +55,20 @@ export default function WaitingScreen({
     : "";
 
   return (
-    <div className="w-full flex">
+    <div className="w-full h-full flex">
       {/* Left: Tata Cara */}
-      <div className="w-1/2 flex flex-col justify-center p-16 border-r border-black relative">
+      <div className="w-1/2 flex flex-col justify-center p-12 border-r border-black relative">
         <div className="max-w-md mx-auto w-full">
           <h2 className="text-2xl font-bold text-black mb-2">
             Tata Cara Print Dokumen.
           </h2>
-          <p className="text-sm text-gray-600 mb-12">
+          <p className="text-sm text-gray-600 mb-8">
             Ikuti langkah berikut untuk mulai mencetak dokumen Anda!
           </p>
 
-          <div className="space-y-10">
+          <div className="space-y-7">
             <div className="flex items-start gap-5">
-              <div className="w-14 h-14 rounded-full border border-black flex items-center justify-center flex-shrink-0">
+              <div className="w-12 h-12 rounded-full border border-black flex items-center justify-center flex-shrink-0">
                 <svg
                   width="24"
                   height="24"
@@ -94,7 +90,7 @@ export default function WaitingScreen({
               </div>
             </div>
             <div className="flex items-start gap-5">
-              <div className="w-14 h-14 rounded-full border border-black flex items-center justify-center flex-shrink-0">
+              <div className="w-12 h-12 rounded-full border border-black flex items-center justify-center flex-shrink-0">
                 <svg
                   width="24"
                   height="24"
@@ -116,7 +112,7 @@ export default function WaitingScreen({
               </div>
             </div>
             <div className="flex items-start gap-5">
-              <div className="w-14 h-14 rounded-full border border-black flex items-center justify-center flex-shrink-0">
+              <div className="w-12 h-12 rounded-full border border-black flex items-center justify-center flex-shrink-0">
                 <svg
                   width="24"
                   height="24"
@@ -140,7 +136,7 @@ export default function WaitingScreen({
             </div>
           </div>
         </div>
-        <div className="absolute bottom-10 left-0 w-full text-center">
+        <div className="absolute bottom-5 left-0 w-full text-center">
           <p className="text-sm text-gray-600">
             ©2026 E-Print Service | All Rights Reserved.
           </p>
@@ -148,30 +144,27 @@ export default function WaitingScreen({
       </div>
 
       {/* Right: QR Section */}
-      <div className="w-1/2 flex flex-col items-center justify-center p-16 relative">
+      <div className="w-1/2 flex flex-col items-center justify-center p-12 relative">
         <h2 className="text-2xl font-bold text-black mb-2">
           Scan untuk Memulai
         </h2>
-        <p className="text-sm text-gray-600 mb-10">
+        <p className="text-sm text-gray-600 mb-7">
           Siap nge-print? Scan QR Code dibawah ini.
         </p>
 
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm inline-block mb-10">
-          <QRCodeSVG value={qrUrl} size={280} level="H" />
+        <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm inline-block mb-7">
+          <QRCodeSVG value={qrUrl} size={260} level="H" />
         </div>
 
         {expiresAt && (
           <div className="border border-black rounded-full px-6 py-2 text-sm text-black">
             QR Code berakhir dalam{" "}
-            <CountdownTimer
-              targetDate={expiresAt}
-              onExpire={handleQrExpire}
-            />
+            <CountdownTimer targetDate={expiresAt} onExpire={handleQrExpire} />
           </div>
         )}
-
-
       </div>
     </div>
   );
-}
+};
+
+export default WaitingScreen;

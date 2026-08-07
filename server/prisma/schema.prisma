@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "mysql"
-  url      = "mysql://oneprint:oneprintpassword@localhost:3306/oneprint"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -76,8 +76,8 @@ model Printer {
 model PrinterSettings {
   id                 String   @id @default(uuid())
   printerId          String   @unique
-  pricePerPageBw     Decimal  @default(1500) // price for B&W per page (Rp)
-  pricePerPageColor  Decimal  @default(3000) // price for color per page (Rp)
+  pricePerPageBw     Decimal  @default(1500) @db.Decimal(10, 2) // price for B&W per page (Rp)
+  pricePerPageColor  Decimal  @default(3000) @db.Decimal(10, 2) // price for color per page (Rp)
   updatedAt          DateTime @updatedAt
 
   printer            Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)

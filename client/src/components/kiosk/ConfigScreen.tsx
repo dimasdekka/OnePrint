@@ -1,11 +1,14 @@
 "use client";
 
 import { useKioskStore } from "@/store/kioskStore";
-import { useKioskSession } from "@/hooks/kiosk/useKioskSession";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function ConfigScreen() {
+interface ConfigScreenProps {
+  onPayment: () => void | Promise<void>;
+}
+
+export default function ConfigScreen({ onPayment }: ConfigScreenProps) {
   const {
     fileName,
     filePath,
@@ -22,24 +25,22 @@ export default function ConfigScreen() {
     setPageRange,
   } = useKioskStore();
 
-  const { handlePayment } = useKioskSession();
-
   return (
-    <div className="w-full flex flex-col items-center px-8 relative">
-      <div className="text-center mb-10">
-        <h2 className="text-2xl font-bold text-black mb-2">
+    <div className="w-full h-full min-h-0 flex flex-col items-center px-8 relative overflow-hidden">
+      <div className="text-center mb-4">
+        <h2 className="text-xl font-bold text-black mb-1">
           Konfigurasi Cetak Detail
         </h2>
-        <p className="text-sm text-gray-600">
+        <p className="text-xs text-gray-600">
           Sesuaikan dokumen Anda sebelum masuk ke proses pembayaran.
         </p>
       </div>
 
-      <div className="w-full max-w-6xl flex gap-6 pb-20">
+      <div className="w-full max-w-6xl flex flex-1 min-h-0 gap-4 pb-8">
         {/* Left: Preview */}
-        <div className="flex-1 bg-white border border-gray-200 rounded-xl p-6 shadow-sm flex flex-col">
-          <h3 className="text-lg font-bold text-black mb-4">File Preview</h3>
-          <div className="flex-1 bg-gray-50 border border-gray-300 relative min-h-[500px] overflow-hidden">
+        <div className="flex-1 min-w-0 bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col min-h-0">
+          <h3 className="text-base font-bold text-black mb-3">File Preview</h3>
+          <div className="flex-1 min-h-0 bg-gray-50 border border-gray-300 relative overflow-hidden">
             {filePath && fileName?.endsWith(".pdf") ? (
               <iframe
                 src={`http://${window.location.hostname}:3001${encodeURI(filePath)}#view=Fit`}
@@ -58,8 +59,8 @@ export default function ConfigScreen() {
               </div>
             )}
           </div>
-          <div className="mt-4 flex justify-between items-center text-sm text-gray-600">
-            <span className="flex items-center gap-2">
+          <div className="mt-3 flex justify-between items-center gap-3 text-xs text-gray-600">
+            <span className="flex min-w-0 items-center gap-2">
               <svg
                 width="20"
                 height="20"
@@ -74,25 +75,25 @@ export default function ConfigScreen() {
                 <line x1="16" y1="17" x2="8" y2="17"></line>
                 <polyline points="10 9 9 9 8 9"></polyline>
               </svg>
-              {fileName}
+              <span className="truncate">{fileName}</span>
             </span>
-            <span>({pageCount} pages terdeteksi)</span>
+            <span className="shrink-0">({pageCount} pages terdeteksi)</span>
           </div>
         </div>
 
         {/* Right: Settings */}
-        <div className="w-[500px] flex flex-col gap-6">
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-black mb-6">
+        <div className="w-[460px] flex flex-col gap-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <h3 className="text-base font-bold text-black mb-4">
               Print Settings
             </h3>
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
-                <label className="text-sm font-bold text-black block mb-2">
+                <label className="text-xs font-bold text-black block mb-2">
                   Copies
                 </label>
-                <div className="flex border border-black rounded-md overflow-hidden h-12">
+                <div className="flex border border-black rounded-md overflow-hidden h-10">
                   <button
                     onClick={() => setCopies(Math.max(1, copies - 1))}
                     className="w-12 flex items-center justify-center hover:bg-gray-100 border-r border-black font-medium bg-white"
@@ -103,7 +104,7 @@ export default function ConfigScreen() {
                     type="number"
                     value={copies}
                     onChange={(e) => setCopies(parseInt(e.target.value) || 1)}
-                    className="w-full text-center font-bold text-base outline-none text-black"
+                    className="w-full text-center font-bold text-sm outline-none text-black"
                   />
                   <button
                     onClick={() => setCopies(copies + 1)}
@@ -114,10 +115,10 @@ export default function ConfigScreen() {
                 </div>
               </div>
               <div>
-                <label className="text-sm font-bold text-black block mb-2">
+                <label className="text-xs font-bold text-black block mb-2">
                   Pages to Print
                 </label>
-                <div className="h-12 w-full relative">
+                <div className="h-10 w-full relative">
                   <input
                     type="number"
                     value={estimatedPages}
@@ -128,15 +129,15 @@ export default function ConfigScreen() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm font-bold text-black block mb-2">
+                <label className="text-xs font-bold text-black block mb-2">
                   Warna Cetak
                 </label>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setColorMode("bw")}
-                    className={`flex-1 flex items-center justify-center gap-2 border border-black rounded-md px-3 h-12 text-sm font-bold ${
+                    className={`flex-1 flex items-center justify-center gap-2 border border-black rounded-md px-3 h-10 text-xs font-bold ${
                       colorMode === "bw" ? "bg-gray-100" : "bg-white"
                     }`}
                   >
@@ -149,7 +150,7 @@ export default function ConfigScreen() {
                   </button>
                   <button
                     onClick={() => setColorMode("color")}
-                    className={`flex-1 flex items-center justify-center gap-2 border border-black rounded-md px-3 h-12 text-sm font-bold ${
+                    className={`flex-1 flex items-center justify-center gap-2 border border-black rounded-md px-3 h-10 text-xs font-bold ${
                       colorMode === "color" ? "bg-gray-100" : "bg-white"
                     }`}
                   >
@@ -163,10 +164,10 @@ export default function ConfigScreen() {
                 </div>
               </div>
               <div>
-                <label className="text-sm font-bold text-black block mb-2">
+                <label className="text-xs font-bold text-black block mb-2">
                   Page Range (Opsional)
                 </label>
-                <div className="h-12 w-full relative">
+                <div className="h-10 w-full relative">
                   <input
                     type="text"
                     value={pageRange}
@@ -179,12 +180,12 @@ export default function ConfigScreen() {
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-black mb-6">
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <h3 className="text-base font-bold text-black mb-4">
               Ringkasan Biaya
             </h3>
 
-            <div className="space-y-3 mb-6 text-sm text-gray-600">
+            <div className="space-y-2 mb-4 text-xs text-gray-600">
               <div className="flex justify-between">
                 <span>Jumlah Lembar Cetak ({estimatedPages}x)</span>
                 <span>
@@ -208,12 +209,12 @@ export default function ConfigScreen() {
               </div>
             </div>
 
-            <div className="border-t border-black pt-4 flex items-center justify-between">
+            <div className="border-t border-black pt-3 flex items-center justify-between gap-4">
               <div>
                 <div className="text-xs text-gray-600 mb-1">
                   Total Pembayaran
                 </div>
-                <div className="text-xl font-bold text-black">
+                <div className="text-lg font-bold text-black">
                   Rp{" "}
                   {(
                     copies *
@@ -223,9 +224,9 @@ export default function ConfigScreen() {
                 </div>
               </div>
               <button
-                onClick={handlePayment}
+                onClick={onPayment}
                 disabled={loadingPayment}
-                className="border border-black rounded-full px-6 py-2 h-12 font-bold text-black hover:bg-gray-100 transition flex items-center gap-2 disabled:opacity-50 text-sm"
+                className="border border-black rounded-full px-5 py-2 h-10 font-bold text-black hover:bg-gray-100 transition flex items-center gap-2 disabled:opacity-50 text-xs whitespace-nowrap"
               >
                 {loadingPayment ? "Processing..." : "Lanjut Pembayaran"}
                 {!loadingPayment && <span>→</span>}
@@ -235,8 +236,8 @@ export default function ConfigScreen() {
         </div>
       </div>
 
-      <div className="absolute bottom-10 left-0 w-full text-center">
-        <p className="text-sm text-gray-600">
+      <div className="absolute bottom-1 left-0 w-full text-center">
+        <p className="text-xs text-gray-600">
           © 2026 E-Print Service | All Rights Reserved.
         </p>
       </div>

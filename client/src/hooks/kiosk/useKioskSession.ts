@@ -6,6 +6,111 @@ import { getApiUrl } from "@/lib/getApiUrl";
 import { createSocket } from "@/lib/socket";
 import { useKioskStore } from "@/store/kioskStore";
 
+const KIOSK_ID_STORAGE_KEY = "oneprint_kiosk_id";
+const MIDTRANS_SNAP_SCRIPT_ID = "midtrans-snap-script";
+const RELOAD_TRACE_STORAGE_KEY = "oneprint_reload_trace";
+
+const clearKioskSessionStorage = () => {
+  localStorage.removeItem("oneprint_session");
+  localStorage.removeItem("oneprint_amount");
+  localStorage.removeItem("oneprint_file");
+  localStorage.removeItem("oneprint_settings");
+  localStorage.removeItem("oneprint_idle_deadline");
+};
+
+const getOrCreateKioskId = () => {
+  const existing = localStorage.getItem(KIOSK_ID_STORAGE_KEY);
+  if (existing) return existing;
+
+  const randomId =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
+  const kioskId = `kiosk_${randomId}`;
+  localStorage.setItem(KIOSK_ID_STORAGE_KEY, kioskId);
+  return kioskId;
+};
+
+const loadMidtransSnap = () => {
+  if (window.snap?.pay) return Promise.resolve();
+
+  return new Promise<void>((resolve, reject) => {
+    const existingScript = document.getElementById(MIDTRANS_SNAP_SCRIPT_ID);
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(), { once: true });
+      existingScript.addEventListener("error", () => reject(new Error("Failed to load Midtrans Snap")), {
+        once: true,
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = MIDTRANS_SNAP_SCRIPT_ID;
+    script.src = "https://app.sandbox.midtrans.com/snap/snap.js";
+    script.dataset.clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY ?? "";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Midtrans Snap"));
+    document.body.appendChild(script);
+  });
+};
+
+const getNavigationType = () => {
+  const [navigation] = performance.getEntriesByType(
+    "navigation",
+  ) as PerformanceNavigationTiming[];
+  return navigation?.type ?? "unknown";
+};
+
+const appendReloadTrace = (
+  event: string,
+  meta: Record<string, unknown> = {},
+) => {
+  try {
+    const previous = JSON.parse(
+      localStorage.getItem(RELOAD_TRACE_STORAGE_KEY) ?? "[]",
+    ) as Array<Record<string, unknown>>;
+    const next = [
+      ...previous,
+      {
+        event,
+        at: new Date().toISOString(),
+        href: window.location.href,
+        navType: getNavigationType(),
+        visibility: document.visibilityState,
+        sessionId: localStorage.getItem("oneprint_session"),
+        hasFile: !!localStorage.getItem("oneprint_file"),
+        idleDeadline: localStorage.getItem("oneprint_idle_deadline"),
+        ...meta,
+      },
+    ].slice(-40);
+
+    localStorage.setItem(RELOAD_TRACE_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // Diagnostic only.
+  }
+};
+
+type UploadedFilePayload = {
+  sessionId?: string;
+  fileName: string;
+  pageCount: number;
+  filePath: string;
+};
+
+type SessionStateResponse = {
+  success: boolean;
+  session?: {
+    id: string;
+    status: string;
+    expired?: boolean;
+    copies?: number;
+    colorMode?: "bw" | "color";
+    pageRange?: string;
+    pageCount?: number;
+    file?: UploadedFilePayload | null;
+  };
+};
+
 /**
  * useKioskSession
  *
@@ -20,6 +125,7 @@ import { useKioskStore } from "@/store/kioskStore";
 export const useKioskSession = () => {
   const {
     sessionId,
+    kioskState,
     pageCount,
     pageRange,
     copies,
@@ -48,6 +154,7 @@ export const useKioskSession = () => {
   } = useKioskStore();
 
   const socketRef = useRef<ReturnType<typeof createSocket> | null>(null);
+  const kioskIdRef = useRef<string | null>(null);
 
   // ── Printer availability check ─────────────────────────────────────────────
 
@@ -62,36 +169,115 @@ export const useKioskSession = () => {
       );
       const available = onlinePrinters.length > 0;
       setPrintersAvailable(available);
-
-      try {
-        const settingsRes = await kioskApi.get(`${apiUrl}/api/admin/settings`);
-        if (settingsRes.data) {
-          setPriceBw(settingsRes.data.pricePerPageBw ?? 1500);
-          setPriceColor(settingsRes.data.pricePerPageColor ?? 3000);
-        }
-      } catch (err) {
-        console.error("Failed to fetch settings:", err);
-      }
     } catch (err) {
       console.error("Failed to check printers:", err);
       setPrintersAvailable(false);
     } finally {
       setPrinterLoading(false);
     }
-  }, [setPrinterLoading, setPriceBw, setPriceColor, setPrintersAvailable]);
+  }, [setPrinterLoading, setPrintersAvailable]);
+
+  const loadPrintSettings = useCallback(async () => {
+    try {
+      const apiUrl = getApiUrl();
+      const settingsRes = await kioskApi.get(`${apiUrl}/api/admin/settings`);
+      if (settingsRes.data) {
+        setPriceBw(settingsRes.data.pricePerPageBw ?? 1500);
+        setPriceColor(settingsRes.data.pricePerPageColor ?? 3000);
+      }
+    } catch (err) {
+      console.error("Failed to fetch settings:", err);
+    }
+  }, [setPriceBw, setPriceColor]);
+
+  const applyUploadedFile = useCallback(
+    (data: UploadedFilePayload) => {
+      const normalizedPath = data.filePath.replace(/\\/g, "/");
+
+      setFileName(data.fileName);
+      setPageCount(data.pageCount);
+      setEstimatedPages(data.pageCount);
+      setFilePath(normalizedPath);
+      setKioskState("uploaded");
+
+      localStorage.setItem(
+        "oneprint_file",
+        JSON.stringify({ ...data, filePath: normalizedPath }),
+      );
+
+      const currentSession = data.sessionId ?? localStorage.getItem("oneprint_session");
+      if (currentSession) localStorage.setItem("oneprint_session", currentSession);
+    },
+    [
+      setEstimatedPages,
+      setFileName,
+      setFilePath,
+      setKioskState,
+      setPageCount,
+    ],
+  );
+
+  const syncSessionState = useCallback(
+    async (targetSessionId: string | null) => {
+      if (!targetSessionId) return;
+
+      try {
+        const apiUrl = getApiUrl();
+        const { data } = await kioskApi.get<SessionStateResponse>(
+          `${apiUrl}/api/sessions/${targetSessionId}/state`,
+        );
+        const session = data.session;
+
+        if (session?.expired || session?.status !== "uploaded" || !session.file) return;
+
+        appendReloadTrace("session_state_recovered", {
+          recoveredSessionId: session.id,
+          status: session.status,
+        });
+
+        applyUploadedFile({
+          ...session.file,
+          sessionId: session.id,
+          pageCount: session.file.pageCount ?? session.pageCount ?? 1,
+        });
+
+        if (session.copies) setCopies(session.copies);
+        if (session.colorMode) setColorMode(session.colorMode);
+        if (session.pageRange) setPageRange(session.pageRange);
+      } catch (error) {
+        console.warn("Failed to sync session state:", error);
+      }
+    },
+    [applyUploadedFile, setColorMode, setCopies, setPageRange],
+  );
 
   useEffect(() => {
+    appendReloadTrace("kiosk_hook_mount");
+
+    const handleBeforeUnload = () => {
+      appendReloadTrace("beforeunload");
+    };
+    const handlePageHide = (event: PageTransitionEvent) => {
+      appendReloadTrace("pagehide", { persisted: event.persisted });
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handlePageHide);
+
     checkPrinters();
-    const interval = setInterval(checkPrinters, 30_000);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    loadPrintSettings();
+
+    return () => {
+      appendReloadTrace("kiosk_hook_unmount");
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, [checkPrinters, loadPrintSettings]);
 
   // ── Boot: socket + restore saved session ───────────────────────────────────
 
   useEffect(() => {
     // ── Restore localStorage state ──
-    const existingSessionId = localStorage.getItem("oneprint_session");
     const savedFile = localStorage.getItem("oneprint_file");
 
     if (savedFile) {
@@ -148,40 +334,62 @@ export const useKioskSession = () => {
     // "connect" handler reads FRESH localStorage every time (no stale closure).
     // This is critical so reconnects after confirmReset work correctly.
     const handleConnect = () => {
-      const kioskId = "kiosk_" + Math.floor(Math.random() * 1000);
+      kioskIdRef.current = kioskIdRef.current ?? getOrCreateKioskId();
       const freshFile = localStorage.getItem("oneprint_file");
       const freshSession = localStorage.getItem("oneprint_session");
-      console.log("[Socket] connected, registering kiosk", { kioskId, freshSession: freshFile ? freshSession : null });
-      socket.emit("register_kiosk", kioskId, freshFile ? freshSession : null);
+      appendReloadTrace("socket_connect", {
+        socketId: socket.id,
+        freshSession,
+        hasFile: !!freshFile,
+      });
+      console.log("[Socket] connected, registering kiosk", {
+        kioskId: kioskIdRef.current,
+        freshSession,
+        hasFile: !!freshFile,
+      });
+      socket.emit("register_kiosk", kioskIdRef.current, freshSession);
     };
 
     const handleSessionInit = (data: { sessionId: string; expiresAt: string }) => {
       console.log("[Socket] session_init received", data.sessionId);
       const currentFile = localStorage.getItem("oneprint_file");
-      if (!currentFile) {
+      const storedSession = localStorage.getItem("oneprint_session");
+      const receivedNewSession = storedSession !== data.sessionId;
+      appendReloadTrace("session_init", {
+        receivedSessionId: data.sessionId,
+        storedSession,
+        receivedNewSession,
+      });
+
+      if (currentFile && receivedNewSession) {
+        localStorage.removeItem("oneprint_file");
+        localStorage.removeItem("oneprint_settings");
+        localStorage.removeItem("oneprint_amount");
+        resetSession();
+      }
+
+      if (!currentFile || receivedNewSession) {
         setKioskState("waiting");
       }
       setSessionId(data.sessionId);
       setExpiresAt(data.expiresAt);
       localStorage.setItem("oneprint_session", data.sessionId);
+      syncSessionState(data.sessionId);
     };
 
-    const handleFileUploaded = (data: { fileName: string; pageCount: number; filePath: string }) => {
+    const isActiveSessionEvent = (eventSessionId?: string) => {
+      if (!eventSessionId) return true;
+      return localStorage.getItem("oneprint_session") === eventSessionId;
+    };
+
+    const handleFileUploaded = (data: UploadedFilePayload) => {
+      if (!isActiveSessionEvent(data.sessionId)) return;
       console.log("SOCKET: file-uploaded received!", data);
-      const normalizedPath = data.filePath.replace(/\\/g, "/");
-      setFileName(data.fileName);
-      setPageCount(data.pageCount);
-      setEstimatedPages(data.pageCount);
-      setFilePath(normalizedPath);
-      setKioskState("uploaded");
-
-      const fileData = { ...data, filePath: normalizedPath };
-      localStorage.setItem("oneprint_file", JSON.stringify(fileData));
-      const currentSession = localStorage.getItem("oneprint_session");
-      if (currentSession) localStorage.setItem("oneprint_session", currentSession);
+      applyUploadedFile(data);
     };
 
-    const handlePrintStarted = () => {
+    const handlePrintStarted = (data: { sessionId?: string } = {}) => {
+      if (!isActiveSessionEvent(data.sessionId)) return;
       setKioskState("printing");
       setPrintProgress(0);
       localStorage.removeItem("oneprint_file");
@@ -189,14 +397,13 @@ export const useKioskSession = () => {
     };
 
     const handlePrintProgress = (data: { sessionId: string; percent: number }) => {
+      if (!isActiveSessionEvent(data.sessionId)) return;
       setPrintProgress(data.percent);
     };
 
-    const handlePrintComplete = () => {
-      localStorage.removeItem("oneprint_session");
-      localStorage.removeItem("oneprint_amount");
-      localStorage.removeItem("oneprint_file");
-      localStorage.removeItem("oneprint_settings");
+    const handlePrintComplete = (data: { sessionId?: string } = {}) => {
+      if (!isActiveSessionEvent(data.sessionId)) return;
+      clearKioskSessionStorage();
 
       setPrintProgress(100);
       setTimeout(() => {
@@ -210,19 +417,16 @@ export const useKioskSession = () => {
     };
 
     const handlePrinterUpdate = () => {
-      const apiUrl = getApiUrl();
-      kioskApi
-        .get(`${apiUrl}/api/admin/printers`)
-        .then(({ data }) => {
-          const onlinePrinters = (data as Array<{ status: string; isConnected: boolean }>).filter(
-            (p) => p.status === "Online" && p.isConnected === true,
-          );
-          setPrintersAvailable(onlinePrinters.length > 0);
-        })
-        .catch(() => {/* ignore transient errors */});
+      appendReloadTrace("printer_update");
+      checkPrinters();
+    };
+
+    const handleDisconnect = (reason: string) => {
+      appendReloadTrace("socket_disconnect", { reason });
     };
 
     socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
     socket.on("session_init", handleSessionInit);
     socket.on("file-uploaded", handleFileUploaded);
     socket.on("print_started", handlePrintStarted);
@@ -230,11 +434,18 @@ export const useKioskSession = () => {
     socket.on("print_complete", handlePrintComplete);
     socket.on("printer_update", handlePrinterUpdate);
 
+    if (socket.connected) {
+      handleConnect();
+    } else {
+      socket.connect();
+    }
+
     // IMPORTANT: Do NOT call socket.disconnect() here.
     // socket.disconnect() sets socket.active = false which permanently disables
     // auto-reconnect. Instead, only remove our specific listeners.
     return () => {
       socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
       socket.off("session_init", handleSessionInit);
       socket.off("file-uploaded", handleFileUploaded);
       socket.off("print_started", handlePrintStarted);
@@ -244,6 +455,18 @@ export const useKioskSession = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const activeSession = sessionId ?? localStorage.getItem("oneprint_session");
+    if (!activeSession || kioskState !== "waiting") return;
+
+    syncSessionState(activeSession);
+    const interval = window.setInterval(() => {
+      syncSessionState(activeSession);
+    }, 3_000);
+
+    return () => window.clearInterval(interval);
+  }, [kioskState, sessionId, syncSessionState]);
 
   // ── Derived: estimated pages from page range ───────────────────────────────
 
@@ -298,11 +521,9 @@ export const useKioskSession = () => {
     console.log("[reRegisterKiosk] forcing reconnect, connected=", socket.connected);
 
     if (socket.connected) {
-      // Briefly disconnect then reconnect to trigger fresh "connect" event
       socket.disconnect();
     }
-    // socket.connect() re-enables socket.active and initiates connection
-    socket.connect();
+    window.setTimeout(() => socket.connect(), 0);
   }, []);
 
   const handlePayment = useCallback(async () => {
@@ -321,9 +542,15 @@ export const useKioskSession = () => {
         colorMode,
         copies,
         pageCount: estimatedPages,
+        pageRange,
       };
 
       const { data } = await kioskApi.post(`${apiUrl}/api/order/init`, paymentData);
+      await loadMidtransSnap();
+
+      if (!window.snap?.pay) {
+        throw new Error("Midtrans Snap is not available");
+      }
 
       localStorage.setItem("oneprint_amount", totalAmount.toString());
       localStorage.setItem("oneprint_session", activeSession);
@@ -379,21 +606,41 @@ export const useKioskSession = () => {
     setShowResetModal(true);
   }, [setShowResetModal]);
 
+  const invalidateSession = useCallback((targetSessionId: string | null) => {
+    if (!targetSessionId) return;
+
+    const apiUrl = getApiUrl();
+    kioskApi
+      .post(`${apiUrl}/api/sessions/${targetSessionId}/reset`)
+      .catch((error) => {
+        console.warn("Failed to invalidate session on server:", error);
+      });
+  }, []);
+
   const confirmReset = useCallback(() => {
+    const activeSession = sessionId ?? localStorage.getItem("oneprint_session");
+
     // Close Midtrans Snap popup if it's open
     if (typeof window !== "undefined" && window.snap?.hide) {
       try { window.snap.hide(); } catch { /* ignore */ }
     }
     // Clear localStorage
-    localStorage.removeItem("oneprint_file");
-    localStorage.removeItem("oneprint_settings");
-    localStorage.removeItem("oneprint_amount");
-    localStorage.removeItem("oneprint_session");
+    invalidateSession(activeSession);
+    clearKioskSessionStorage();
     // Soft-reset Zustand state
     resetSession();
     // Reconnect socket → triggers "connect" → emits register_kiosk → gets session_init
     reRegisterKiosk();
-  }, [resetSession, reRegisterKiosk]);
+  }, [invalidateSession, resetSession, reRegisterKiosk, sessionId]);
 
-  return { handlePayment, handleReset, confirmReset, reRegisterKiosk };
+  const handleQrExpire = useCallback(() => {
+    const activeSession = sessionId ?? localStorage.getItem("oneprint_session");
+
+    invalidateSession(activeSession);
+    clearKioskSessionStorage();
+    resetSession();
+    reRegisterKiosk();
+  }, [invalidateSession, resetSession, reRegisterKiosk, sessionId]);
+
+  return { handlePayment, handleReset, confirmReset, handleQrExpire };
 };

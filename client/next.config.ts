@@ -4,7 +4,8 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     "localhost",
     "127.0.0.1",
-    "172.24.160.1", // Docker container IP
+    "10.150.18.99", // Current LAN IP
+    "172.24.160.1", // Internal network IP
     "192.168.1.5", // LAN IP — agar HP bisa akses via QR code
     "192.168.1.3", // Current IP
   ],

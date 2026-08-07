@@ -8,6 +8,9 @@ export interface PaymentData {
   printerId?: string | null;
   colorMode?: "bw" | "color";
   amount?: number;
+  copies?: number;
+  pageCount?: number;
+  pageRange?: string;
 }
 
 export interface MidtransResponse {

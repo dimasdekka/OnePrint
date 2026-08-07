@@ -1,26 +1,41 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+const IDLE_DEADLINE_KEY = "oneprint_idle_deadline";
+
 interface IdleTimerProps {
-  timeoutSeconds?: number; // default 60
+  timeoutSeconds?: number;
   onTimeout?: () => void;
 }
+
+const getRemainingSeconds = (timeoutSeconds: number) => {
+  if (typeof window === "undefined") return timeoutSeconds;
+
+  const deadline = Number(localStorage.getItem(IDLE_DEADLINE_KEY));
+  if (!deadline) return timeoutSeconds;
+
+  return Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+};
+
+const setIdleDeadline = (timeoutSeconds: number) => {
+  const deadline = Date.now() + timeoutSeconds * 1000;
+  localStorage.setItem(IDLE_DEADLINE_KEY, String(deadline));
+};
 
 export default function IdleTimer({
   timeoutSeconds = 60,
   onTimeout,
 }: IdleTimerProps) {
   const router = useRouter();
-  const [timeLeft, setTimeLeft] = useState(timeoutSeconds);
-  // Use a ref so the interval callback always reads the latest values
-  // without being recreated (avoids stale closure + "setState in render" issues)
+  const [timeLeft, setTimeLeft] = useState(() =>
+    getRemainingSeconds(timeoutSeconds),
+  );
   const onTimeoutRef = useRef(onTimeout);
   const routerRef = useRef(router);
   const firedRef = useRef(false);
 
-  // Keep refs in sync with latest props/router
   useEffect(() => {
     onTimeoutRef.current = onTimeout;
   }, [onTimeout]);
@@ -31,43 +46,40 @@ export default function IdleTimer({
 
   useEffect(() => {
     firedRef.current = false;
-    setTimeLeft(timeoutSeconds);
+
+    if (!localStorage.getItem(IDLE_DEADLINE_KEY)) {
+      setIdleDeadline(timeoutSeconds);
+    }
 
     const resetTimer = () => {
+      setIdleDeadline(timeoutSeconds);
       setTimeLeft(timeoutSeconds);
       firedRef.current = false;
     };
 
-    // Events to detect user activity
-    window.addEventListener("mousemove", resetTimer);
-    window.addEventListener("click", resetTimer);
-    window.addEventListener("keypress", resetTimer);
-    window.addEventListener("scroll", resetTimer);
+    window.addEventListener("pointerdown", resetTimer);
+    window.addEventListener("keydown", resetTimer);
     window.addEventListener("touchstart", resetTimer);
+    window.addEventListener("input", resetTimer);
 
-    // Countdown interval — ONLY decrement state here, never call side effects
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) return 0;
-        return prev - 1;
-      });
+      setTimeLeft(getRemainingSeconds(timeoutSeconds));
     }, 1000);
 
     return () => {
       clearInterval(timer);
-      window.removeEventListener("mousemove", resetTimer);
-      window.removeEventListener("click", resetTimer);
-      window.removeEventListener("keypress", resetTimer);
-      window.removeEventListener("scroll", resetTimer);
+      window.removeEventListener("pointerdown", resetTimer);
+      window.removeEventListener("keydown", resetTimer);
       window.removeEventListener("touchstart", resetTimer);
+      window.removeEventListener("input", resetTimer);
     };
   }, [timeoutSeconds]);
 
-  // Separate effect to fire the callback AFTER render, when timeLeft hits 0
-  // This is the correct pattern — never call side effects inside setState updaters
   useEffect(() => {
     if (timeLeft === 0 && !firedRef.current) {
       firedRef.current = true;
+      localStorage.removeItem(IDLE_DEADLINE_KEY);
+
       if (onTimeoutRef.current) {
         onTimeoutRef.current();
       } else {
@@ -83,7 +95,7 @@ export default function IdleTimer({
   };
 
   return (
-    <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-white border border-black text-black px-6 py-2 rounded-full shadow-sm z-50 flex items-center gap-2 text-sm font-medium">
+    <div className="absolute top-5 left-1/2 -translate-x-1/2 bg-white border border-black text-black px-5 py-2 rounded-full shadow-sm z-50 flex items-center gap-2 text-xs font-medium">
       <span className="font-bold">Auto Close in {formatTime(timeLeft)}</span>
     </div>
   );

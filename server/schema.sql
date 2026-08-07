@@ -1,94 +1,97 @@
--- CreateTable User
-CREATE TABLE `User` (
-    `id` VARCHAR(191) NOT NULL,
-    `username` VARCHAR(191) NOT NULL UNIQUE,
-    `password` VARCHAR(191) NOT NULL,
-    `role` VARCHAR(191) NOT NULL DEFAULT 'admin',
-    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `updatedAt` DATETIME(3) NOT NULL,
+-- PostgreSQL/Supabase schema reference for OnePrint.
+-- Prefer `npm run db:push` from the server folder so Prisma owns the schema.
 
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS "User" (
+    "id" TEXT NOT NULL,
+    "username" TEXT NOT NULL,
+    "password" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
--- CreateTable Session (Updated)
-CREATE TABLE `Session` (
-    `id` VARCHAR(191) NOT NULL,
-    `userId` VARCHAR(191) NULL,
-    `kioskId` VARCHAR(191) NULL,
-    `socketId` VARCHAR(191) NULL,
-    `fileId` VARCHAR(191) NULL,
-    `copies` INT NOT NULL DEFAULT 1,
-    `colorMode` VARCHAR(191) NULL DEFAULT 'bw',
-    `pageRange` VARCHAR(191) NULL DEFAULT 'all',
-    `pageCount` INT NOT NULL DEFAULT 1,
-    `status` VARCHAR(191) NOT NULL DEFAULT 'waiting',
-    `expiresAt` DATETIME(3) NOT NULL,
-    `used` BOOLEAN NOT NULL DEFAULT false,
-    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `updatedAt` DATETIME(3) NOT NULL,
+    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+);
 
-    INDEX `Session_userId_fkey` (`userId`),
-    UNIQUE INDEX `Session_fileId_key` (`fileId`),
-    PRIMARY KEY (`id`),
-    CONSTRAINT `Session_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT `Session_fileId_fkey` FOREIGN KEY (`fileId`) REFERENCES `File`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE UNIQUE INDEX IF NOT EXISTS "User_username_key" ON "User"("username");
 
--- CreateTable Transaction (Updated)
-CREATE TABLE `Transaction` (
-    `id` VARCHAR(191) NOT NULL,
-    `sessionId` VARCHAR(191) NOT NULL,
-    `printerId` VARCHAR(191) NULL,
-    `midtransToken` VARCHAR(191) NULL,
-    `orderId` VARCHAR(191) NOT NULL UNIQUE,
-    `paymentStatus` VARCHAR(191) NULL DEFAULT 'pending',
-    `amount` INT NOT NULL,
-    `paidAt` DATETIME(3) NULL,
-    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `updatedAt` DATETIME(3) NOT NULL,
+CREATE TABLE IF NOT EXISTS "Printer" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "printerId" TEXT,
+    "description" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'Offline',
+    "driver" TEXT,
+    "isConnected" BOOLEAN NOT NULL DEFAULT true,
+    "lastSync" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    INDEX `Transaction_sessionId_fkey` (`sessionId`),
-    INDEX `Transaction_printerId_fkey` (`printerId`),
-    PRIMARY KEY (`id`),
-    CONSTRAINT `Transaction_sessionId_fkey` FOREIGN KEY (`sessionId`) REFERENCES `Session`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `Transaction_printerId_fkey` FOREIGN KEY (`printerId`) REFERENCES `Printer`(`id`) ON DELETE SET NULL ON UPDATE CASCADE
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CONSTRAINT "Printer_pkey" PRIMARY KEY ("id")
+);
 
--- CreateTable Printer (Updated)
-CREATE TABLE `Printer` (
-    `id` VARCHAR(191) NOT NULL,
-    `name` VARCHAR(191) NOT NULL UNIQUE,
-    `printerId` VARCHAR(191) NULL UNIQUE,
-    `description` VARCHAR(191) NULL,
-    `status` VARCHAR(191) NOT NULL DEFAULT 'Offline',
-    `driver` VARCHAR(191) NULL,
-    `isConnected` BOOLEAN NOT NULL DEFAULT true,
-    `lastSync` DATETIME(3) NULL,
-    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `updatedAt` DATETIME(3) NOT NULL,
+CREATE UNIQUE INDEX IF NOT EXISTS "Printer_name_key" ON "Printer"("name");
+CREATE UNIQUE INDEX IF NOT EXISTS "Printer_printerId_key" ON "Printer"("printerId");
 
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS "File" (
+    "id" TEXT NOT NULL,
+    "filename" VARCHAR(255) NOT NULL,
+    "filepath" VARCHAR(255) NOT NULL,
+    "totalPages" INTEGER NOT NULL,
+    "uploadedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
--- CreateTable PrinterSettings
-CREATE TABLE `PrinterSettings` (
-    `id` VARCHAR(191) NOT NULL,
-    `printerId` VARCHAR(191) NOT NULL UNIQUE,
-    `pricePerPageBw` DECIMAL(10,2) NOT NULL DEFAULT 1500,
-    `pricePerPageColor` DECIMAL(10,2) NOT NULL DEFAULT 3000,
-    `updatedAt` DATETIME(3) NOT NULL,
+    CONSTRAINT "File_pkey" PRIMARY KEY ("id")
+);
 
-    PRIMARY KEY (`id`),
-    CONSTRAINT `PrinterSettings_printerId_fkey` FOREIGN KEY (`printerId`) REFERENCES `Printer`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS "Session" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT,
+    "kioskId" TEXT,
+    "socketId" TEXT,
+    "fileId" TEXT,
+    "copies" INTEGER NOT NULL DEFAULT 1,
+    "colorMode" TEXT DEFAULT 'color',
+    "pageRange" TEXT DEFAULT 'all',
+    "pageCount" INTEGER NOT NULL DEFAULT 1,
+    "status" TEXT NOT NULL DEFAULT 'waiting',
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "used" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
--- CreateTable File
-CREATE TABLE `File` (
-    `id` VARCHAR(191) NOT NULL,
-    `filename` VARCHAR(255) NOT NULL,
-    `filepath` VARCHAR(255) NOT NULL,
-    `totalPages` INT NOT NULL,
-    `uploadedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    CONSTRAINT "Session_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "Session_fileId_fkey" FOREIGN KEY ("fileId") REFERENCES "File"("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
 
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE UNIQUE INDEX IF NOT EXISTS "Session_fileId_key" ON "Session"("fileId");
+
+CREATE TABLE IF NOT EXISTS "Transaction" (
+    "id" TEXT NOT NULL,
+    "sessionId" TEXT NOT NULL,
+    "printerId" TEXT,
+    "midtransToken" TEXT,
+    "orderId" TEXT NOT NULL,
+    "paymentStatus" TEXT NOT NULL DEFAULT 'pending',
+    "amount" INTEGER NOT NULL,
+    "paidAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Transaction_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "Transaction_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "Session"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Transaction_printerId_fkey" FOREIGN KEY ("printerId") REFERENCES "Printer"("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "Transaction_orderId_key" ON "Transaction"("orderId");
+
+CREATE TABLE IF NOT EXISTS "PrinterSettings" (
+    "id" TEXT NOT NULL,
+    "printerId" TEXT NOT NULL,
+    "pricePerPageBw" DECIMAL(65,30) NOT NULL DEFAULT 1500,
+    "pricePerPageColor" DECIMAL(65,30) NOT NULL DEFAULT 3000,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PrinterSettings_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "PrinterSettings_printerId_fkey" FOREIGN KEY ("printerId") REFERENCES "Printer"("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "PrinterSettings_printerId_key" ON "PrinterSettings"("printerId");

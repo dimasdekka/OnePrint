@@ -3,13 +3,13 @@
 import { useKioskSession } from "@/hooks/kiosk/useKioskSession";
 import { useKioskStore } from "@/store/kioskStore";
 import KioskLayout from "@/components/kiosk/KioskLayout";
-import WaitingScreen from "@/components/kiosk/WaitingScreen";
+import { WaitingScreen } from "@/components/kiosk/WaitingScreen";
 import ConfigScreen from "@/components/kiosk/ConfigScreen";
 import PrintingScreen from "@/components/kiosk/PrintingScreen";
 
 declare global {
   interface Window {
-    snap: {
+    snap?: {
       pay: (
         token: string,
         options: {
@@ -20,17 +20,17 @@ declare global {
         },
       ) => void;
       /** Programmatically hide/close the Snap payment popup */
-      hide: () => void;
+      hide?: () => void;
     };
   }
 }
 
 export default function KioskPage() {
   const {
-    handlePayment: _handlePayment,
+    handlePayment,
     handleReset,
     confirmReset,
-    reRegisterKiosk,
+    handleQrExpire,
   } = useKioskSession();
 
   const { kioskState, sessionId, expiresAt, printProgress } = useKioskStore();
@@ -51,11 +51,11 @@ export default function KioskPage() {
         <WaitingScreen
           sessionId={sessionId}
           expiresAt={expiresAt}
-          onQrExpire={reRegisterKiosk}
+          onQrExpire={handleQrExpire}
         />
       )}
 
-      {kioskState === "uploaded" && <ConfigScreen />}
+      {kioskState === "uploaded" && <ConfigScreen onPayment={handlePayment} />}
 
       {kioskState === "printing" && (
         <PrintingScreen printProgress={printProgress} />

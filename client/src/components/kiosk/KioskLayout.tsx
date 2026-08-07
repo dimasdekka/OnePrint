@@ -1,6 +1,6 @@
 "use client";
 
-import Script from "next/script";
+import { useEffect } from "react";
 import IdleTimer from "@/components/IdleTimer";
 import { useKioskStore } from "@/store/kioskStore";
 
@@ -17,30 +17,41 @@ export default function KioskLayout({
 }) {
   const { kioskState, printersAvailable, printerLoading, showResetModal, setShowResetModal } =
     useKioskStore();
+  const hasActiveDocument = kioskState === "uploaded" || kioskState === "configured";
+
+  useEffect(() => {
+    if (!hasActiveDocument) return;
+
+    const blockUnexpectedUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", blockUnexpectedUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", blockUnexpectedUnload);
+    };
+  }, [hasActiveDocument]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-white font-sans text-gray-900 relative">
-      <Script
-        src="https://app.sandbox.midtrans.com/snap/snap.js"
-        data-client-key={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
-      />
-
+    <div className="flex h-screen flex-col overflow-hidden bg-white font-sans text-gray-900 relative">
       {/* Idle Timer - only when file is uploaded */}
-      {(kioskState === "uploaded" || kioskState === "configured") && (
+      {hasActiveDocument && (
         <IdleTimer timeoutSeconds={60} onTimeout={confirmReset} />
       )}
 
       {/* Header */}
-      <div className="absolute top-8 left-8 z-10">
-        <h1 className="text-2xl font-bold tracking-tight text-black">
+      <div className="absolute top-5 left-8 z-10">
+        <h1 className="text-xl font-bold tracking-tight text-black">
           E-Print Service
         </h1>
-        <p className="text-sm text-gray-600">Universitas Pamulang Serang</p>
+        <p className="text-xs text-gray-600">Universitas Pamulang Serang</p>
       </div>
 
       {/* Cancel / Reset button */}
-      {(kioskState === "uploaded" || kioskState === "configured") && (
-        <div className="absolute top-8 right-8 z-10 flex gap-4">
+      {hasActiveDocument && (
+        <div className="absolute top-5 right-8 z-10 flex gap-4">
           <button
             onClick={handleReset}
             className="border border-black bg-white rounded-full px-6 py-2 text-sm font-medium hover:bg-gray-100 transition"
@@ -72,7 +83,7 @@ export default function KioskLayout({
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex pt-28 pb-10">{children}</div>
+      <div className="flex min-h-0 flex-1 pt-20 pb-5">{children}</div>
 
       {/* Reset Confirmation Modal */}
       {showResetModal && (

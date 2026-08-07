@@ -1,5 +1,5 @@
 const sessionService = require("../services/session.service");
-const { SOCKET_EVENTS, SESSION_STATUS } = require("../utils/constants");
+const { SOCKET_EVENTS } = require("../utils/constants");
 const logger = require("../utils/logger");
 
 /**
@@ -14,11 +14,11 @@ const logger = require("../utils/logger");
 const handleJoinSession = (socket, io) => {
   socket.on(SOCKET_EVENTS.JOIN_SESSION, async ({ sessionId }) => {
     try {
-      const session = await sessionService.getSessionById(sessionId);
+      const validation = await sessionService.validateSession(sessionId);
 
-      if (!session) {
+      if (!validation.valid) {
         socket.emit(SOCKET_EVENTS.ERROR, {
-          message: "Invalid Session ID",
+          message: validation.reason || "Invalid Session ID",
         });
         return;
       }

@@ -19,7 +19,13 @@ const logger = require("../utils/logger");
  * POST /api/payment/token
  */
 const generateToken = asyncHandler(async (req, res) => {
-  const { sessionId, printerId, colorMode, amount, copies, pageCount } = req.body;
+  const { sessionId, printerId, colorMode, amount, copies, pageCount, pageRange } = req.body;
+  const normalizedPageRange =
+    typeof pageRange === "string" && pageRange.trim() !== ""
+      ? pageRange.trim().toLowerCase() === "all"
+        ? "all"
+        : pageRange.replace(/\s+/g, "")
+      : undefined;
 
   // Get session to retrieve filename and print details
   const session = await sessionService.getSessionById(sessionId);
@@ -27,6 +33,18 @@ const generateToken = asyncHandler(async (req, res) => {
     return res.status(400).json({
       success: false,
       message: "Session not found or no file uploaded",
+    });
+  }
+
+  if (
+    session.status === SESSION_STATUS.EXPIRED ||
+    session.status === SESSION_STATUS.FAILED ||
+    session.status === SESSION_STATUS.PRINTING ||
+    session.status === SESSION_STATUS.COMPLETED
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Session is no longer available. Please scan a new QR code.",
     });
   }
 
@@ -49,6 +67,7 @@ const generateToken = asyncHandler(async (req, res) => {
   const updateData = {};
   if (colorMode) updateData.colorMode = colorMode;
   if (copies) updateData.copies = copies;
+  if (normalizedPageRange) updateData.pageRange = normalizedPageRange;
   if (pageCount) updateData.pageCount = pageCount;
   
   if (Object.keys(updateData).length > 0) {
@@ -104,18 +123,26 @@ const completePayment = asyncHandler(async (req, res) => {
   const { sessionId, orderId } = req.body;
 
   try {
-    // Get payment result
+    // Get session details for file path and prevent stale/double print jobs.
+    const session = await sessionService.getSessionById(sessionId);
+    if (!session || !session.file?.filepath) {
+      throw new Error("Session or file path not found");
+    }
+
+    if (
+      session.status === SESSION_STATUS.EXPIRED ||
+      session.status === SESSION_STATUS.FAILED ||
+      session.status === SESSION_STATUS.PRINTING ||
+      session.status === SESSION_STATUS.COMPLETED
+    ) {
+      throw new Error("Session is no longer available for printing");
+    }
+
     const result = await paymentService.processPayment(sessionId);
 
     if (orderId) {
       // Mark transaction as paid
       await paymentService.markTransactionAsPaid(orderId);
-    }
-
-    // Get session details for file path
-    const session = await sessionService.getSessionById(sessionId);
-    if (!session || !session.file?.filepath) {
-      throw new Error("Session or file path not found");
     }
 
     logger.info("Payment completed, starting print job", {
@@ -138,8 +165,8 @@ const completePayment = asyncHandler(async (req, res) => {
 
     const io = req.app.get("io");
     if (io) {
-      // Notify kiosk that printing started
-      io.emit(SOCKET_EVENTS.PRINT_STARTED, { sessionId });
+      // Notify only clients in this session room.
+      io.to(sessionId).emit(SOCKET_EVENTS.PRINT_STARTED, { sessionId });
 
       // Notify admin dashboard
       io.emit(SOCKET_EVENTS.ADMIN_JOB_UPDATE, {
@@ -174,7 +201,7 @@ const completePayment = asyncHandler(async (req, res) => {
             // Progress goes 0 → 95% during estimated time (never reach 100% until actually done)
             const rawPct = Math.min((elapsed / estimatedMs) * 95, 95);
             const pct = Math.round(rawPct);
-            io.emit(SOCKET_EVENTS.PRINT_PROGRESS, {
+            io.to(sessionId).emit(SOCKET_EVENTS.PRINT_PROGRESS, {
               sessionId,
               percent: pct,
               totalPages,
@@ -186,6 +213,8 @@ const completePayment = asyncHandler(async (req, res) => {
           printer.id,
           session.file.filepath,
           session.copies || 1,
+          session.colorMode || "color",
+          session.pageRange || "all",
         );
 
         // Clear progress ticker
@@ -195,7 +224,7 @@ const completePayment = asyncHandler(async (req, res) => {
 
         // Emit 100% then complete
         if (io) {
-          io.emit(SOCKET_EVENTS.PRINT_PROGRESS, {
+          io.to(sessionId).emit(SOCKET_EVENTS.PRINT_PROGRESS, {
             sessionId,
             percent: 100,
             totalPages,
@@ -208,7 +237,7 @@ const completePayment = asyncHandler(async (req, res) => {
         );
 
         if (io) {
-          io.emit(SOCKET_EVENTS.PRINT_COMPLETE, { sessionId });
+          io.to(sessionId).emit(SOCKET_EVENTS.PRINT_COMPLETE, { sessionId });
         }
       } catch (printError) {
         logger.error("Print job failed", {
@@ -222,7 +251,7 @@ const completePayment = asyncHandler(async (req, res) => {
         );
 
         if (io) {
-          io.emit(SOCKET_EVENTS.ERROR, {
+          io.to(sessionId).emit(SOCKET_EVENTS.ERROR, {
             sessionId,
             message: "Print failed: " + printError.message,
           });
